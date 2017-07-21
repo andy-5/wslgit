@@ -23,11 +23,24 @@ fn translate_path(arg: String) -> String {
     arg
 }
 
+fn shell_escape(arg: String) -> String {
+    // ToDo: This really only handles arguments with spaces.
+    // More complete shell escaping is required for the general case.
+    if arg.contains(" ") {
+        return vec![
+            String::from("\""),
+            arg,
+            String::from("\"")].join("");
+    }
+    arg
+}
+
 fn main() {
     // ToDo: Add git command as first item
-    let git_args: Vec<String> = env::args().skip(1).map(
-            translate_path).collect();
-    for arg in git_args {
-        println!("{:?}", arg);
-    }
+    let mut git_args: Vec<String> = vec![String::from("git")];
+    git_args.extend(env::args().skip(1)
+        .map(translate_path)
+        .map(shell_escape));
+    let git_cmd = git_args.join(" ");
+    println!("{}", git_cmd);
 }
