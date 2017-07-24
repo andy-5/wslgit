@@ -1,4 +1,5 @@
 use std::env;
+use std::process::Command;
 
 fn translate_path(arg: String) -> String {
     if let Some(index) = arg.find(":\\") {
@@ -36,11 +37,17 @@ fn shell_escape(arg: String) -> String {
 }
 
 fn main() {
-    // ToDo: Add git command as first item
     let mut git_args: Vec<String> = vec![String::from("git")];
     git_args.extend(env::args().skip(1)
         .map(translate_path)
         .map(shell_escape));
     let git_cmd = git_args.join(" ");
-    println!("{}", git_cmd);
+    let status = Command::new("bash")
+        .arg("-c")
+        .arg(&git_cmd)
+        .status()
+        .expect(&format!("Failed to execute command '{}'", &git_cmd));
+    if !status.success() {
+        eprintln!("Command '{}' returned non-zero exit code", &git_cmd);
+    }
 }
