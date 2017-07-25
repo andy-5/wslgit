@@ -4,7 +4,7 @@ use std::process::Command;
 fn translate_path(arg: String) -> String {
     if let Some(index) = arg.find(":\\") {
         if index != 1 {
-            println!("Not a path: {:?}", arg);
+            // Not a path
             return arg;
         }
         let mut path_chars = arg.chars();
