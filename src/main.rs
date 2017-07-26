@@ -67,6 +67,7 @@ fn main() {
         .map(shell_escape));
     let git_cmd = git_args.join(" ");
     let output = Command::new("bash")
+        .arg("-i")
         .arg("-c")
         .arg(&git_cmd)
         .output()
