@@ -6,3 +6,5 @@
 
 - Initial version of `wslgit` with basic functionality.
 
+
+[0.1.0]: #
