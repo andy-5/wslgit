@@ -72,7 +72,6 @@ fn main() {
         .output()
         .expect(&format!("Failed to execute command '{}'", &git_cmd));
     let output_str = String::from_utf8_lossy(&output.stdout);
-    println!("{}", output_str);
     for line in output_str.lines().map(translate_path_to_win) {
         println!("{}", line);
     }
