@@ -1,5 +1,5 @@
 use std::env;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 fn translate_path_to_unix(arg: String) -> String {
     if let Some(index) = arg.find(":\\") {
@@ -66,12 +66,16 @@ fn main() {
         .map(translate_path_to_unix)
         .map(shell_escape));
     let git_cmd = git_args.join(" ");
-    let output = Command::new("bash")
+    let git_proc = Command::new("bash")
         .arg("-i")
         .arg("-c")
         .arg(&git_cmd)
-        .output()
+        .stdout(Stdio::piped())
+        .spawn()
         .expect(&format!("Failed to execute command '{}'", &git_cmd));
+    let output = git_proc
+        .wait_with_output()
+        .expect(&format!("Failed to wait for git call '{}'", &git_cmd));
     let output_str = String::from_utf8_lossy(&output.stdout);
     for line in output_str.lines().map(translate_path_to_win) {
         println!("{}", line);
