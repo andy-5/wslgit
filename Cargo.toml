@@ -1,6 +1,6 @@
 [package]
 name = "wslgit"
-version = "0.1.0"
-authors = ["Andreas Riffnaller-Schiefer <a.schiefer@cgv.tugraz.at>"]
+version = "0.2.0"
+authors = ["Andreas Riffnaller-Schiefer <andreas.schiefer@gmail.com>"]
 
 [dependencies]
