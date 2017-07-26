@@ -1,7 +1,7 @@
 use std::env;
 use std::process::Command;
 
-fn translate_path(arg: String) -> String {
+fn translate_path_to_unix(arg: String) -> String {
     if let Some(index) = arg.find(":\\") {
         if index != 1 {
             // Not a path
@@ -24,6 +24,30 @@ fn translate_path(arg: String) -> String {
     arg
 }
 
+fn translate_path_to_win(line: &str) -> String {
+    if let Some(index) = line.find("/mnt/") {
+        if index != 0 {
+            // Path somewhere in the middle, don't change
+            return String::from(line);
+        }
+        let mut path_chars = line.chars();
+        if let Some(drive) = path_chars.nth(5) {
+            if let Some(slash) = path_chars.next() {
+                if slash != '/' {
+                    // not a windows mount
+                    return String::from(line);
+                }
+                let mut win_path = String::from(
+                    drive.to_uppercase().collect::<String>());
+                win_path.push_str(":/");
+                win_path.push_str(&path_chars.collect::<String>());
+                return win_path;
+            }
+        }
+    }
+    String::from(line)
+}
+
 fn shell_escape(arg: String) -> String {
     // ToDo: This really only handles arguments with spaces.
     // More complete shell escaping is required for the general case.
@@ -39,15 +63,17 @@ fn shell_escape(arg: String) -> String {
 fn main() {
     let mut git_args: Vec<String> = vec![String::from("git")];
     git_args.extend(env::args().skip(1)
-        .map(translate_path)
+        .map(translate_path_to_unix)
         .map(shell_escape));
     let git_cmd = git_args.join(" ");
-    let status = Command::new("bash")
+    let output = Command::new("bash")
         .arg("-c")
         .arg(&git_cmd)
-        .status()
+        .output()
         .expect(&format!("Failed to execute command '{}'", &git_cmd));
-    if !status.success() {
-        eprintln!("Command '{}' returned non-zero exit code", &git_cmd);
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    println!("{}", output_str);
+    for line in output_str.lines().map(translate_path_to_win) {
+        println!("{}", line);
     }
 }
