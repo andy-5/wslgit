@@ -1,7 +1,10 @@
 # WSLGit Changelog
 
 
-## [0.2.0] - in development
+## [0.3.0] - in development
+
+
+## [0.2.0] - 2017-07-27
 
 ### Added
 
@@ -17,4 +20,5 @@
 
 [0.1.0]: #
 [0.2.0]: #
+[0.3.0]: #
 
