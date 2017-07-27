@@ -3,6 +3,10 @@
 
 ## [0.3.0] - in development
 
+### Added
+
+- Add proper license (MIT).
+
 
 ## [0.2.0] - 2017-07-27
 

@@ -2,5 +2,6 @@
 name = "wslgit"
 version = "0.3.0"
 authors = ["Andreas Riffnaller-Schiefer <andreas.schiefer@gmail.com>"]
+license = "MIT"
 
 [dependencies]
