@@ -15,7 +15,7 @@ representations.
 To use this inside VSCode, put the `wslgit.exe` executable somewhere on
 your computer and set the appropriate path in your VSCode `settings.json`:
 
-```json
+```
 {
     "git.path": "C:\CHANGE\TO\PATH\TO\wslgit.exe"
 }
