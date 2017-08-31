@@ -9,6 +9,11 @@ For these two to interoperate, this tool translates paths
 between the Windows (`C:\Foo\Bar`) and Linux (`/mnt/c/Foo/Bar`)
 representations.
 
+## Download
+
+The latest binary release can be found on the
+[releases page](https://github.com/andy-5/wslgit/releases).
+
 
 ## Usage in VSCode
 
