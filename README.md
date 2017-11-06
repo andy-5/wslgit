@@ -22,7 +22,7 @@ your computer and set the appropriate path in your VSCode `settings.json`:
 
 ```
 {
-    "git.path": "C:\CHANGE\TO\PATH\TO\wslgit.exe"
+    "git.path": "C:\\CHANGE\\TO\\PATH\\TO\\wslgit.exe"
 }
 ```
 
