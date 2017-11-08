@@ -66,10 +66,24 @@ fn main() {
         .map(translate_path_to_unix)
         .map(shell_escape));
     let git_cmd = git_args.join(" ");
+    let stdin_mode = if git_cmd.ends_with("--version") {
+        // For some reason, the git subprocess seems to hang, waiting for 
+        // input, when VS Code 1.17.2 tries to detect if `git --version` works
+        // on Windows 10 1709 (specifically, in `findSpecificGit` in the
+        // VS Code source file `extensions/git/src/git.ts`).
+        // To workaround this, we only pass stdin to the git subprocess
+        // for all other commands, but not for the initial `--version` check.
+        // Stdin is needed for example when commiting, where the commit
+        // message is passed on stdin.
+        Stdio::null()
+    } else {
+        Stdio::inherit()
+    };
     let git_proc = Command::new("bash")
         .arg("-i")
         .arg("-c")
         .arg(&git_cmd)
+        .stdin(stdin_mode)
         .stdout(Stdio::piped())
         .spawn()
         .expect(&format!("Failed to execute command '{}'", &git_cmd));

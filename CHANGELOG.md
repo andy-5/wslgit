@@ -1,11 +1,16 @@
 # WSLGit Changelog
 
 
-## [0.3.0] - in development
+## [0.3.0] - 2017-11-08
 
 ### Added
 
 - Add proper license (MIT).
+
+### Fixed
+
+- Git waiting for input when called from VS Code to check if `git --version`
+    works.
 
 
 ## [0.2.0] - 2017-07-27
