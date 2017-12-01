@@ -58,3 +58,18 @@ translation is necessary.
 Addtionally, be careful with special characters interpreted by the shell.
 Only spaces in arguments are currently handled.
 
+
+## Building from source
+
+First, install Rust from https://www.rust-lang.org. Rust on Windows also
+requires Visual Studio or the Visual C++ Build Tools for linking.
+
+The final executable can then be build by running
+
+```
+cargo build --release
+```
+
+inside the root directory of this project. The resulting binary will
+be located in `./target/release/`.
+
