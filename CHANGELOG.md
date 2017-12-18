@@ -1,6 +1,14 @@
 # WSLGit Changelog
 
 
+## [0.4.0] - 2017-12-18
+
+### Fixed
+
+- Compatibility with VS Code 1.19, which now requires proper Windows paths
+    (with backslashes) and a lowercase drive letter.
+
+
 ## [0.3.0] - 2017-11-08
 
 ### Added
