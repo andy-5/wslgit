@@ -94,4 +94,7 @@ fn main() {
     for line in output_str.lines().map(translate_path_to_win) {
         println!("{}", line);
     }
+    if let Some(exit_code) = output.status.code() {
+        std::process::exit(exit_code);
+    }
 }

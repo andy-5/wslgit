@@ -1,6 +1,13 @@
 # WSLGit Changelog
 
 
+## [0.5.0] - unreleased
+
+### Added
+
+- Return exit code from git subprocess
+
+
 ## [0.4.0] - 2017-12-18
 
 ### Fixed
