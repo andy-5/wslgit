@@ -1,11 +1,15 @@
 # WSLGit Changelog
 
 
-## [0.5.0] - unreleased
+## [0.5.0] - 2018-01-11
 
 ### Added
 
-- Return exit code from git subprocess
+- Return exit code from git subprocess.
+
+### Fixed
+
+- Fix superfluous empty `.git` source control providers.
 
 
 ## [0.4.0] - 2017-12-18
@@ -46,4 +50,4 @@
 [0.2.0]: https://github.com/andy-5/wslgit/releases/tag/v0.2.0
 [0.3.0]: https://github.com/andy-5/wslgit/releases/tag/v0.3.0
 [0.4.0]: https://github.com/andy-5/wslgit/releases/tag/v0.4.0
-
+[0.5.0]: https://github.com/andy-5/wslgit/releases/tag/v0.5.0
