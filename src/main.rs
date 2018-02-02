@@ -80,7 +80,7 @@ fn main() {
         Stdio::inherit()
     };
     let git_proc = Command::new("bash")
-        .arg("-i")
+        .env("BASH_ENV", "~/.bashrc")
         .arg("-c")
         .arg(&git_cmd)
         .stdin(stdin_mode)
