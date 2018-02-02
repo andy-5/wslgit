@@ -48,6 +48,7 @@ fn translate_path_to_win(line: &str) -> String {
     String::from(line)
 }
 
+/*
 fn shell_escape(arg: String) -> String {
     // ToDo: This really only handles arguments with spaces.
     // More complete shell escaping is required for the general case.
@@ -59,12 +60,13 @@ fn shell_escape(arg: String) -> String {
     }
     arg
 }
+*/
 
 fn main() {
     let mut git_args: Vec<String> = vec![String::from("git")];
     git_args.extend(env::args().skip(1)
-        .map(translate_path_to_unix)
-        .map(shell_escape));
+        //.map(shell_escape)
+        .map(translate_path_to_unix));
     let git_cmd = git_args.join(" ");
     let stdin_mode = if git_cmd.ends_with("--version") {
         // For some reason, the git subprocess seems to hang, waiting for 
@@ -79,10 +81,9 @@ fn main() {
     } else {
         Stdio::inherit()
     };
-    let git_proc = Command::new("bash")
+    let git_proc = Command::new("wsl")
         .env("BASH_ENV", "~/.bashrc")
-        .arg("-c")
-        .arg(&git_cmd)
+        .args(&git_args)
         .stdin(stdin_mode)
         .stdout(Stdio::piped())
         .spawn()
