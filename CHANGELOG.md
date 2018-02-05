@@ -1,6 +1,13 @@
 # WSLGit Changelog
 
 
+## [0.6.0] - unreleased
+
+### Fixed
+
+- Unix paths inside file contents are not being erroneously translated anymore.
+
+
 ## [0.5.0] - 2018-01-11
 
 ### Added
