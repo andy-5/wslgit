@@ -91,8 +91,16 @@ fn main() {
         .wait_with_output()
         .expect(&format!("Failed to wait for git call '{}'", &git_cmd));
     let output_str = String::from_utf8_lossy(&output.stdout);
-    for line in output_str.lines().map(translate_path_to_win) {
-        println!("{}", line);
+    // add git commands that must skip translate_path_to_win
+    // e.g. = &["show", "status, "rev-parse", "for-each-ref"];
+    const NO_TRANSLATE: &'static [&'static str] = &["show"];
+    if NO_TRANSLATE.iter().position(|&r| r == git_args[1]).is_none() {
+        for line in output_str.lines().map(translate_path_to_win) {
+            println!("{}", line);
+        }
+    }
+    else {
+        print!("{}", output_str);
     }
     if let Some(exit_code) = output.status.code() {
         std::process::exit(exit_code);
