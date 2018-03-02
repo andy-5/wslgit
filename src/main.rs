@@ -61,11 +61,37 @@ fn shell_escape(arg: String) -> String {
 }
 
 fn main() {
+    let mut cmd_args = Vec::new();
     let mut git_args: Vec<String> = vec![String::from("git")];
-    git_args.extend(env::args().skip(1)
-        .map(translate_path_to_unix)
-        .map(shell_escape));
-    let git_cmd = git_args.join(" ");
+    let git_cmd: String;
+
+    // check for advanced usage indicated by BASH_ENV and WSLENV=BASH_ENV
+    let mut interactive_shell = true;
+    if env::var("BASH_ENV").is_ok() {
+        let wslenv = env::var("WSLENV");
+        if wslenv.is_ok() && wslenv.unwrap().split(':').position(|r| r.eq_ignore_ascii_case("BASH_ENV")).is_some() {
+            interactive_shell = false;
+        }
+    }
+
+    // process git command arguments
+    if interactive_shell {
+        git_args.extend(env::args().skip(1)
+            .map(translate_path_to_unix)
+            .map(shell_escape));
+        git_cmd = git_args.join(" ");
+        cmd_args.push("bash".to_string());
+        cmd_args.push("-ic".to_string());
+        cmd_args.push(git_cmd.clone());
+    }
+    else {
+        git_args.extend(env::args().skip(1)
+        .map(translate_path_to_unix));
+        git_cmd = git_args.join(" ");
+        cmd_args.clone_from(&git_args);
+    }
+
+    // setup stdin/stdout
     let stdin_mode = if git_cmd.ends_with("--version") {
         // For some reason, the git subprocess seems to hang, waiting for 
         // input, when VS Code 1.17.2 tries to detect if `git --version` works
@@ -79,10 +105,10 @@ fn main() {
     } else {
         Stdio::inherit()
     };
-    let git_proc = Command::new("bash")
-        .arg("-i")
-        .arg("-c")
-        .arg(&git_cmd)
+
+    // launch git inside WSL
+    let git_proc = Command::new("wsl")
+        .args(&cmd_args)
         .stdin(stdin_mode)
         .stdout(Stdio::piped())
         .spawn()
@@ -91,6 +117,7 @@ fn main() {
         .wait_with_output()
         .expect(&format!("Failed to wait for git call '{}'", &git_cmd));
     let output_str = String::from_utf8_lossy(&output.stdout);
+
     // add git commands that must skip translate_path_to_win
     // e.g. = &["show", "status, "rev-parse", "for-each-ref"];
     const NO_TRANSLATE: &'static [&'static str] = &["show"];
@@ -102,6 +129,8 @@ fn main() {
     else {
         print!("{}", output_str);
     }
+
+    // forward any exit code
     if let Some(exit_code) = output.status.code() {
         std::process::exit(exit_code);
     }
