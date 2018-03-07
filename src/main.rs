@@ -1,5 +1,6 @@
 use std::env;
 use std::process::{Command, Stdio};
+use std::io::{self, Write};
 
 fn translate_path_to_unix(arg: String) -> String {
     if let Some(index) = arg.find(":\\") {
@@ -116,19 +117,30 @@ fn main() {
     let output = git_proc
         .wait_with_output()
         .expect(&format!("Failed to wait for git call '{}'", &git_cmd));
-    let output_str = String::from_utf8_lossy(&output.stdout);
 
     // add git commands that must skip translate_path_to_win
     // e.g. = &["show", "status, "rev-parse", "for-each-ref"];
     const NO_TRANSLATE: &'static [&'static str] = &["show"];
     if NO_TRANSLATE.iter().position(|&r| r == git_args[1]).is_none() {
+        // force with no checking or conversion returned data
+        // into a Rust UTF-8 String
+        let output_str = unsafe {
+            String::from_utf8_unchecked(output.stdout)
+        };
+        // iterate through lines (LR or CRLF endings) and output
+        // each line with paths translated and ending with the
+        // native line ending (CRLF)
         for line in output_str.lines().map(translate_path_to_win) {
             println!("{}", line);
         }
     }
     else {
-        print!("{}", output_str);
+        // output all data unaltered so to not corrupt data output
+        io::stdout().write_all(&output.stdout).unwrap();
     }
+
+    // std::process::exit does not call destructors; must manually flush stdout
+    io::stdout().flush().unwrap();
 
     // forward any exit code
     if let Some(exit_code) = output.status.code() {
