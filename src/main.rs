@@ -61,22 +61,32 @@ fn shell_escape(arg: String) -> String {
     arg
 }
 
+fn use_interactive_shell() -> bool {
+    // check for explicit environment variable setting
+    if let Ok(interactive_flag) = env::var("WSLGIT_USE_INTERACTIVE_SHELL") {
+        if interactive_flag == "false" || interactive_flag == "0" {
+            return false;
+        }
+    }
+    // check for advanced usage indicated by BASH_ENV and WSLENV=BASH_ENV
+    else if env::var("BASH_ENV").is_ok() {
+        if let Ok(wslenv) = env::var("WSLENV") {
+            if wslenv.split(':').position(|r| r.eq_ignore_ascii_case("BASH_ENV")).is_some() {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+
 fn main() {
     let mut cmd_args = Vec::new();
     let mut git_args: Vec<String> = vec![String::from("git")];
     let git_cmd: String;
 
-    // check for advanced usage indicated by BASH_ENV and WSLENV=BASH_ENV
-    let mut interactive_shell = true;
-    if env::var("BASH_ENV").is_ok() {
-        let wslenv = env::var("WSLENV");
-        if wslenv.is_ok() && wslenv.unwrap().split(':').position(|r| r.eq_ignore_ascii_case("BASH_ENV")).is_some() {
-            interactive_shell = false;
-        }
-    }
-
     // process git command arguments
-    if interactive_shell {
+    if use_interactive_shell() {
         git_args.extend(env::args().skip(1)
             .map(translate_path_to_unix)
             .map(shell_escape));
