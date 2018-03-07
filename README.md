@@ -55,8 +55,29 @@ argument is a relative path or just some other string.
 Also, VSCode always uses forward slashes for relative paths, so no
 translation is necessary.
 
-Addtionally, be careful with special characters interpreted by the shell.
+Additionally, be careful with special characters interpreted by the shell.
 Only spaces in arguments are currently handled.
+
+
+## Advanced Usage
+
+Per default, `wslgit` executes `git` inside the WSL environment through bash
+started in interactive mode. This is to automatically support the common case
+where `ssh-agent` or similar tools are setup by `.bashrc` in interactive mode.
+However, this may significantly slow down the execution of git commands.
+To improve startup time, you can configure `wslgit` to execute git via a
+non-interactive bash session. This can be achieved using one of the following
+two methods:
+
+  - In Windows, set the environment variable `WSLGIT_USE_INTERACTIVE_SHELL` to
+    `false` or `0`. This forces `wslgit` to start bash in non-interactive mode.
+  - Alternatively, if the Windows environment variable `BASH_ENV` is set to
+    a bash startup script and the environment variable `WSLENV` contains the
+    string `"BASH_ENV"`, then `wslgit` assumes that the forced startup script
+    from `BASH_ENV` contains everything you need, and therefore also starts
+    bash in non-interactive mode.
+
+    This feature is only available in Windows 10 builds 17063 and later.
 
 
 ## Building from source

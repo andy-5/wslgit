@@ -3,9 +3,18 @@
 
 ## [0.6.0] - unreleased
 
+### Added
+
+- Allow running bash in non-interactive mode (#16, #23).
+
 ### Fixed
 
-- Unix paths inside file contents are not being erroneously translated anymore.
+- Unix paths inside file contents are not being erroneously translated anymore (#19).
+- Initial fix to not assume valid UTF-8 output from git.
+
+### Changed
+
+- Changed to `wsl.exe` to call into the WSL environment.
 
 
 ## [0.5.0] - 2018-01-11
@@ -58,3 +67,4 @@
 [0.3.0]: https://github.com/andy-5/wslgit/releases/tag/v0.3.0
 [0.4.0]: https://github.com/andy-5/wslgit/releases/tag/v0.4.0
 [0.5.0]: https://github.com/andy-5/wslgit/releases/tag/v0.5.0
+[0.6.0]: https://github.com/andy-5/wslgit/releases/tag/v0.6.0
