@@ -11,6 +11,7 @@
 
 - Unix paths inside file contents are not being erroneously translated anymore (#19).
 - Initial fix to not assume valid UTF-8 output from git.
+- Fix running `wslgit` without arguments (#26).
 
 ### Changed
 

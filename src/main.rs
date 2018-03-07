@@ -131,7 +131,15 @@ fn main() {
     // add git commands that must skip translate_path_to_win
     // e.g. = &["show", "status, "rev-parse", "for-each-ref"];
     const NO_TRANSLATE: &'static [&'static str] = &["show"];
-    if NO_TRANSLATE.iter().position(|&r| r == git_args[1]).is_none() {
+
+    let have_args = git_args.len() > 1;
+    let translate_output = if have_args {
+       NO_TRANSLATE.iter().position(|&r| r == git_args[1]).is_none() 
+    } else {
+        false
+    };
+
+    if translate_output {
         // force with no checking or conversion returned data
         // into a Rust UTF-8 String
         let output_str = unsafe {
