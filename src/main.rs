@@ -117,16 +117,11 @@ fn main() {
         Stdio::inherit()
     };
 
-    // launch git inside WSL
-    let git_proc = Command::new("wsl")
-        .args(&cmd_args)
-        .stdin(stdin_mode)
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect(&format!("Failed to execute command '{}'", &git_cmd));
-    let output = git_proc
-        .wait_with_output()
-        .expect(&format!("Failed to wait for git call '{}'", &git_cmd));
+    // setup the git subprocess launched inside WSL
+    let mut git_proc_setup = Command::new("wsl");
+    git_proc_setup.args(&cmd_args)
+        .stdin(stdin_mode);
+    let status;
 
     // add git commands that must skip translate_path_to_win
     // e.g. = &["show", "status, "rev-parse", "for-each-ref"];
@@ -140,6 +135,13 @@ fn main() {
     };
 
     if translate_output {
+        // run the subprocess and capture its output
+        let git_proc = git_proc_setup.stdout(Stdio::piped())
+            .spawn()
+            .expect(&format!("Failed to execute command '{}'", &git_cmd));
+        let output = git_proc
+            .wait_with_output()
+            .expect(&format!("Failed to wait for git call '{}'", &git_cmd));
         // force with no checking or conversion returned data
         // into a Rust UTF-8 String
         let output_str = unsafe {
@@ -151,17 +153,20 @@ fn main() {
         for line in output_str.lines().map(translate_path_to_win) {
             println!("{}", line);
         }
+        status = output.status;
     }
     else {
-        // output all data unaltered so to not corrupt data output
-        io::stdout().write_all(&output.stdout).unwrap();
+        // run the subprocess without capturing its output
+        // the output of the subprocess is passed through unchanged
+        status = git_proc_setup.status()
+            .expect(&format!("Failed to execute command '{}'", &git_cmd));
     }
 
     // std::process::exit does not call destructors; must manually flush stdout
     io::stdout().flush().unwrap();
 
     // forward any exit code
-    if let Some(exit_code) = output.status.code() {
+    if let Some(exit_code) = status.code() {
         std::process::exit(exit_code);
     }
 }
