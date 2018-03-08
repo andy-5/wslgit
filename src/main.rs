@@ -52,7 +52,7 @@ fn translate_path_to_win(line: &str) -> String {
 fn shell_escape(arg: String) -> String {
     // ToDo: This really only handles arguments with spaces.
     // More complete shell escaping is required for the general case.
-    if arg.contains(" ") {
+    if arg.contains(" ") || arg.contains("\n") {
         return vec![
             String::from("\""),
             arg,
