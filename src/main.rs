@@ -40,9 +40,9 @@ fn translate_path_to_win(line: &str) -> String {
                 }
                 let mut win_path = String::from(
                     drive.to_lowercase().collect::<String>());
-                win_path.push_str(":\\");
+                win_path.push_str(":/");
                 win_path.push_str(&path_chars.collect::<String>());
-                return win_path.replace("/", "\\");
+                return win_path;
             }
         }
     }
@@ -84,7 +84,7 @@ fn main() {
     let mut cmd_args = Vec::new();
     let mut git_args: Vec<String> = vec![String::from("git")];
     let git_cmd: String;
-
+   
     // process git command arguments
     if use_interactive_shell() {
         git_args.extend(env::args().skip(1)
@@ -97,7 +97,7 @@ fn main() {
     }
     else {
         git_args.extend(env::args().skip(1)
-        .map(translate_path_to_unix));
+            .map(translate_path_to_unix));
         git_cmd = git_args.join(" ");
         cmd_args.clone_from(&git_args);
     }
@@ -123,13 +123,12 @@ fn main() {
         .stdin(stdin_mode);
     let status;
 
-    // add git commands that must skip translate_path_to_win
-    // e.g. = &["show", "status, "rev-parse", "for-each-ref"];
-    const NO_TRANSLATE: &'static [&'static str] = &["show"];
+    // add git commands that must use translate_path_to_win
+    const TRANSLATED_CMDS: &[&str] = &["rev-parse", "remote"];
 
     let have_args = git_args.len() > 1;
     let translate_output = if have_args {
-       NO_TRANSLATE.iter().position(|&r| r == git_args[1]).is_none() 
+       TRANSLATED_CMDS.iter().position(|&r| r == git_args[1]).is_some()
     } else {
         false
     };
