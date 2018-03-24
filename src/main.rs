@@ -50,15 +50,15 @@ fn translate_path_to_win(line: &str) -> String {
 }
 
 fn shell_escape(arg: String) -> String {
-    // ToDo: This really only handles arguments with spaces.
+    // ToDo: This really only handles arguments with spaces and newlines.
     // More complete shell escaping is required for the general case.
-    if arg.contains(" ") || arg.contains("\n") {
+    if arg.contains(" ") {
         return vec![
             String::from("\""),
             arg,
             String::from("\"")].join("");
     }
-    arg
+    arg.replace("\n", "$'\n'")
 }
 
 fn use_interactive_shell() -> bool {
@@ -84,21 +84,19 @@ fn main() {
     let mut cmd_args = Vec::new();
     let mut git_args: Vec<String> = vec![String::from("git")];
     let git_cmd: String;
-   
-    // process git command arguments
+
+    // process git command arguments   
+    git_args.extend(env::args().skip(1)
+        .map(translate_path_to_unix)
+        .map(shell_escape));
+    git_cmd = git_args.join(" ");
+
     if use_interactive_shell() {
-        git_args.extend(env::args().skip(1)
-            .map(translate_path_to_unix)
-            .map(shell_escape));
-        git_cmd = git_args.join(" ");
         cmd_args.push("bash".to_string());
         cmd_args.push("-ic".to_string());
         cmd_args.push(git_cmd.clone());
     }
     else {
-        git_args.extend(env::args().skip(1)
-            .map(translate_path_to_unix));
-        git_cmd = git_args.join(" ");
         cmd_args.clone_from(&git_args);
     }
 
