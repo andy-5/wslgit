@@ -167,3 +167,33 @@ fn main() {
         std::process::exit(exit_code);
     }
 }
+
+
+#[test]
+fn win_to_unix_path_trans() {
+    assert_eq!(
+        translate_path_to_unix("d:\\test\\file.txt".to_string()),
+        "/mnt/d/test/file.txt");
+    assert_eq!(
+        translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
+        "/mnt/c/Users/test/a space.txt");
+}
+
+#[test]
+fn unix_to_win_path_trans() {
+    assert_eq!(
+        translate_path_to_win("/mnt/d/some path/a file.md"),
+        "d:/some path/a file.md");
+    // does not yet work, required for `git remote -v`
+    assert_eq!(
+        translate_path_to_win("origin  /mnt/c/path/ (fetch)"),
+        "origin  c:/path/ (fetch)");
+}
+
+#[test]
+fn no_path_translation() {
+    assert_eq!(
+        translate_path_to_win("/mnt/other/file.sh"),
+        "/mnt/other/file.sh");
+}
+
