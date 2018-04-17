@@ -151,6 +151,8 @@ fn main() {
             println!("{}", line);
         }
         status = output.status;
+        // std::process::exit does not call destructors; must manually flush stdout
+        io::stdout().flush().unwrap();
     }
     else {
         // run the subprocess without capturing its output
@@ -158,9 +160,6 @@ fn main() {
         status = git_proc_setup.status()
             .expect(&format!("Failed to execute command '{}'", &git_cmd));
     }
-
-    // std::process::exit does not call destructors; must manually flush stdout
-    io::stdout().flush().unwrap();
 
     // forward any exit code
     if let Some(exit_code) = status.code() {
