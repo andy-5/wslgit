@@ -10,13 +10,14 @@
 ### Fixed
 
 - Unix paths inside file contents are not being erroneously translated anymore (#19).
-- Initial fix to not assume valid UTF-8 output from git.
+- Do not assume valid UTF-8 output from git.
 - Fix running `wslgit` without arguments (#26).
 - Escape `\n` newlines in arguments to git (#27).
 
 ### Changed
 
-- Changed to `wsl.exe` to call into the WSL environment.
+- Change to `wsl.exe` to call into the WSL environment.
+- Apply path translation only to output of `rev-parse` and `remote`.
 
 
 ## [0.5.0] - 2018-01-11
