@@ -1,6 +1,12 @@
 use std::env;
 use std::process::{Command, Stdio};
 use std::io::{self, Write};
+use std::borrow::Cow;
+
+#[macro_use] extern crate lazy_static;
+extern crate regex;
+use regex::bytes::Regex;
+
 
 fn translate_path_to_unix(arg: String) -> String {
     if let Some(index) = arg.find(":\\") {
@@ -25,28 +31,13 @@ fn translate_path_to_unix(arg: String) -> String {
     arg
 }
 
-fn translate_path_to_win(line: &str) -> String {
-    if let Some(index) = line.find("/mnt/") {
-        if index != 0 {
-            // Path somewhere in the middle, don't change
-            return String::from(line);
-        }
-        let mut path_chars = line.chars();
-        if let Some(drive) = path_chars.nth(5) {
-            if let Some(slash) = path_chars.next() {
-                if slash != '/' {
-                    // not a windows mount
-                    return String::from(line);
-                }
-                let mut win_path = String::from(
-                    drive.to_lowercase().collect::<String>());
-                win_path.push_str(":/");
-                win_path.push_str(&path_chars.collect::<String>());
-                return win_path;
-            }
-        }
+fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {
+    lazy_static! {
+        static ref WSLPATH_RE: Regex = 
+            Regex::new(r"(?m-u)/mnt/(?P<drive>[A-Za-z])(?P<path>/\S*)")
+                .expect("Failed to compile WSLPATH regex");
     }
-    String::from(line)
+    WSLPATH_RE.replace_all(line, &b"${drive}:${path}"[..])
 }
 
 fn shell_escape(arg: String) -> String {
@@ -139,20 +130,13 @@ fn main() {
         let output = git_proc
             .wait_with_output()
             .expect(&format!("Failed to wait for git call '{}'", &git_cmd));
-        // force with no checking or conversion returned data
-        // into a Rust UTF-8 String
-        let output_str = unsafe {
-            String::from_utf8_unchecked(output.stdout)
-        };
-        // iterate through lines (LR or CRLF endings) and output
-        // each line with paths translated and ending with the
-        // native line ending (CRLF)
-        for line in output_str.lines().map(translate_path_to_win) {
-            println!("{}", line);
-        }
         status = output.status;
-        // std::process::exit does not call destructors; must manually flush stdout
-        io::stdout().flush().unwrap();
+        let output_bytes = output.stdout;
+        let mut stdout = io::stdout();
+        stdout
+            .write_all(&translate_path_to_win(&output_bytes))
+            .expect("Failed to write git output");
+        stdout.flush().expect("Failed to flush output");
     }
     else {
         // run the subprocess without capturing its output
