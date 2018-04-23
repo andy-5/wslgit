@@ -165,18 +165,22 @@ fn win_to_unix_path_trans() {
 #[test]
 fn unix_to_win_path_trans() {
     assert_eq!(
-        translate_path_to_win("/mnt/d/some path/a file.md"),
-        "d:/some path/a file.md");
-    // does not yet work, required for `git remote -v`
+        &*translate_path_to_win(b"/mnt/d/some path/a file.md"),
+        b"d:/some path/a file.md");
     assert_eq!(
-        translate_path_to_win("origin  /mnt/c/path/ (fetch)"),
-        "origin  c:/path/ (fetch)");
+        &*translate_path_to_win(b"origin  /mnt/c/path/ (fetch)"),
+        b"origin  c:/path/ (fetch)");
+    let multiline = b"mirror  /mnt/c/other/ (fetch)\nmirror  /mnt/c/other/ (push)\n";
+    let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
+    assert_eq!(
+        &*translate_path_to_win(&multiline[..]),
+        &multiline_result[..]);
 }
 
 #[test]
 fn no_path_translation() {
     assert_eq!(
-        translate_path_to_win("/mnt/other/file.sh"),
-        "/mnt/other/file.sh");
+        &*translate_path_to_win(b"/mnt/other/file.sh"),
+        b"/mnt/other/file.sh");
 }
 
