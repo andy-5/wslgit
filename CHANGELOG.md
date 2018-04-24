@@ -1,5 +1,7 @@
 # WSLGit Changelog
 
+## [0.7.0] - unreleased
+
 
 ## [0.6.0] - 2018-04-24
 
@@ -10,7 +12,7 @@
 ### Fixed
 
 - Unix paths inside file contents are not being erroneously translated anymore (#19).
-- Do not assume valid UTF-8 output from git.
+- Do not assume valid UTF-8 output from git (#29).
 - Fix running `wslgit` without arguments (#26).
 - Escape `\n` newlines in arguments to git (#27).
 

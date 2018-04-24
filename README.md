@@ -56,7 +56,7 @@ Also, VSCode always uses forward slashes for relative paths, so no
 translation is necessary.
 
 Additionally, be careful with special characters interpreted by the shell.
-Only spaces in arguments are currently handled.
+Only spaces and newlines in arguments are currently handled.
 
 
 ## Advanced Usage
