@@ -50,10 +50,12 @@ installed in WSL.
 Currently, the path translation and shell escaping is very limited,
 just enough to make it work in VSCode.
 
-Only absolute paths are translated, because it is hard to detect if an
+All absolute paths are translated, but relative paths are only
+translated if they point to existing files or directories.
+Otherwise it would be impossible to detect if an
 argument is a relative path or just some other string.
-Also, VSCode always uses forward slashes for relative paths, so no
-translation is necessary.
+VSCode always uses forward slashes for relative paths, so no
+translation is necessary in this case.
 
 Additionally, be careful with special characters interpreted by the shell.
 Only spaces and newlines in arguments are currently handled.

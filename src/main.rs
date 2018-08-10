@@ -2,30 +2,60 @@ use std::env;
 use std::process::{Command, Stdio};
 use std::io::{self, Write};
 use std::borrow::Cow;
+use std::path::{Path, Component, PrefixComponent, Prefix};
 
 #[macro_use] extern crate lazy_static;
 extern crate regex;
 use regex::bytes::Regex;
 
 
+fn get_drive_letter(pc: &PrefixComponent) -> Option<String> {
+    let drive_byte = match pc.kind() {
+        Prefix::VerbatimDisk(d) => Some(d),
+        Prefix::Disk(d) => Some(d),
+        _ => None
+    };
+    drive_byte.map(|drive_letter| {
+        String::from_utf8(vec![drive_letter])
+            .expect(&format!("Invalid drive letter: {}", drive_letter))
+            .to_lowercase()
+    })
+}
+
+fn get_prefix_for_drive(drive: &str) -> String {
+    // todo - lookup mount points
+    format!("/mnt/{}", drive)
+}
+
 fn translate_path_to_unix(arg: String) -> String {
-    if let Some(index) = arg.find(":\\") {
-        if index != 1 {
-            // Not a path
-            return arg;
-        }
-        let mut path_chars = arg.chars();
-        if let Some(drive) = path_chars.next() {
-            let mut wsl_path = String::from("/mnt/");
-            wsl_path.push_str(&drive.to_lowercase().collect::<String>());
-            path_chars.next();
-            wsl_path.push_str(&path_chars.map(|c|
+    {
+        let win_path = Path::new(&arg);
+        if win_path.is_absolute() || win_path.exists() {
+            let wsl_path: String = win_path.components().fold(
+                String::new(), |mut acc, c| {
                     match c {
-                        '\\' => '/',
-                        _ => c,
-                    }
-                ).collect::<String>());
-            return wsl_path;
+                        Component::Prefix(prefix_comp) => {
+                            let d = get_drive_letter(&prefix_comp).expect(
+                                &format!("Cannot handle path {:?}",
+                                         win_path));
+                            acc.push_str(&get_prefix_for_drive(&d));
+                        }
+                        Component::RootDir => {},
+                        _ => {
+                            let d = c.as_os_str().to_str()
+                                .expect(
+                                    &format!("Cannot represent path {:?}",
+                                             win_path))
+                                .to_owned();
+                            if !acc.is_empty() && !acc.ends_with('/') {
+                                acc.push('/');
+                            }
+                            acc.push_str(&d);
+                        }
+                    };
+                    acc
+                });
+            return wsl_path
         }
     }
     arg
@@ -184,3 +214,9 @@ fn no_path_translation() {
         b"/mnt/other/file.sh");
 }
 
+#[test]
+fn relative_path_translation() {
+    assert_eq!(
+        translate_path_to_unix(".\\src\\main.rs".to_string()),
+        "./src/main.rs");
+}

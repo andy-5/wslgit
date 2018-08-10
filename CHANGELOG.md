@@ -2,6 +2,10 @@
 
 ## [0.7.0] - unreleased
 
+### Added
+
+- Support for relative paths as arguments.
+
 
 ## [0.6.0] - 2018-04-24
 
