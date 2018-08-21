@@ -229,3 +229,10 @@ fn relative_path_translation() {
         translate_path_to_unix(".\\src\\main.rs".to_string()),
         "./src/main.rs");
 }
+
+#[test]
+fn long_argument_path_translation() {
+    assert_eq!(
+        translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
+        "--file=/mnt/c/some/path.txt");
+}
