@@ -27,9 +27,18 @@ fn get_prefix_for_drive(drive: &str) -> String {
     format!("/mnt/{}", drive)
 }
 
-fn translate_path_to_unix(arg: String) -> String {
+fn translate_path_to_unix(argument: String) -> String {
     {
-        let win_path = Path::new(&arg);
+        let (argname, arg) = if argument.starts_with("--")
+                             && argument.contains('=') {
+            let parts: Vec<&str> = argument
+                .splitn(2, '=')
+                .collect();
+            (format!("{}=", parts[0]), parts[1])
+        } else {
+            ("".to_owned(), argument.as_ref())
+        };
+        let win_path = Path::new(arg);
         if win_path.is_absolute() || win_path.exists() {
             let wsl_path: String = win_path.components().fold(
                 String::new(), |mut acc, c| {
@@ -55,10 +64,10 @@ fn translate_path_to_unix(arg: String) -> String {
                     };
                     acc
                 });
-            return wsl_path
+            return format!("{}{}", &argname, &wsl_path);
         }
     }
-    arg
+    argument
 }
 
 fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {

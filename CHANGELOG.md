@@ -5,6 +5,7 @@
 ### Added
 
 - Support for relative paths as arguments.
+- Translate paths in long form arguments, e.g. `--file=C:\some\path`
 
 
 ## [0.6.0] - 2018-04-24
