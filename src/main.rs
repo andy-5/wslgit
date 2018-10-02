@@ -72,7 +72,7 @@ fn translate_path_to_unix(argument: String) -> String {
 
 fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {
     lazy_static! {
-        static ref WSLPATH_RE: Regex = 
+        static ref WSLPATH_RE: Regex =
             Regex::new(r"(?m-u)/mnt/(?P<drive>[A-Za-z])(?P<path>/\S*)")
                 .expect("Failed to compile WSLPATH regex");
     }
@@ -115,7 +115,7 @@ fn main() {
     let mut git_args: Vec<String> = vec![String::from("git")];
     let git_cmd: String;
 
-    // process git command arguments   
+    // process git command arguments
     git_args.extend(env::args().skip(1)
         .map(translate_path_to_unix)
         .map(shell_escape));
@@ -132,7 +132,7 @@ fn main() {
 
     // setup stdin/stdout
     let stdin_mode = if git_cmd.ends_with("--version") {
-        // For some reason, the git subprocess seems to hang, waiting for 
+        // For some reason, the git subprocess seems to hang, waiting for
         // input, when VS Code 1.17.2 tries to detect if `git --version` works
         // on Windows 10 1709 (specifically, in `findSpecificGit` in the
         // VS Code source file `extensions/git/src/git.ts`).
@@ -156,7 +156,7 @@ fn main() {
 
     let have_args = git_args.len() > 1;
     let translate_output = if have_args {
-       TRANSLATED_CMDS.iter().position(|&r| r == git_args[1]).is_some()
+       TRANSLATED_CMDS.iter().position(|&r| git_args.iter().position(|a| a == r) != None).is_some()
     } else {
         false
     };
