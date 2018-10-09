@@ -14,6 +14,9 @@ representations.
 The latest binary release can be found on the
 [releases page](https://github.com/andy-5/wslgit/releases).
 
+You may also need to install the latest
+[*Microsoft Visual C++ Redistributable for Visual Studio 2017*](https://aka.ms/vs/15/release/vc_redist.x64.exe).
+
 
 ## Usage in VSCode
 
