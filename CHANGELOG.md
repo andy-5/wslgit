@@ -7,6 +7,17 @@
 - Support for relative paths as arguments.
 - Translate paths in long form arguments, e.g. `--file=C:\some\path`
 
+### Fixed
+
+- Support git commands in any argument position when deciding wether to
+  translate paths in the output of the command.
+
+### Changed
+
+- To support manually mounted network drives, the working directory inside WSL
+  is now explicitly changed to the current working directory of `wslgit`
+  in Windows.
+
 
 ## [0.6.0] - 2018-04-24
 
