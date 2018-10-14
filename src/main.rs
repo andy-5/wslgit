@@ -118,21 +118,21 @@ fn main() {
 
     // process git command arguments
     git_args.extend(env::args().skip(1)
-        .map(translate_path_to_unix)
-        .map(shell_escape));
-    git_cmd = git_args.join(" ");
+        .map(translate_path_to_unix));
 
     if use_interactive_shell() {
         cmd_args.push("bash".to_string());
         cmd_args.push("-ic".to_string());
+        git_cmd = git_args.into_iter().map(shell_escape).collect::<Vec<String>>().join(" ");
         cmd_args.push(git_cmd.clone());
     }
     else {
-        cmd_args.clone_from(&git_args);
+        git_cmd = git_args.join(" ");
+        cmd_args = git_args;
     }
 
     // setup stdin/stdout
-    let stdin_mode = if git_cmd.ends_with("--version") {
+    let stdin_mode = if env::args().last().unwrap() == "--version" {
         // For some reason, the git subprocess seems to hang, waiting for
         // input, when VS Code 1.17.2 tries to detect if `git --version` works
         // on Windows 10 1709 (specifically, in `findSpecificGit` in the
@@ -155,12 +155,8 @@ fn main() {
     // add git commands that must use translate_path_to_win
     const TRANSLATED_CMDS: &[&str] = &["rev-parse", "remote"];
 
-    let have_args = git_args.len() > 1;
-    let translate_output = if have_args {
-       TRANSLATED_CMDS.iter().position(|&r| git_args.iter().position(|a| a == r) != None).is_some()
-    } else {
-        false
-    };
+    let translate_output =
+       env::args().skip(1).position(|arg| TRANSLATED_CMDS.iter().position(|&tcmd| tcmd == arg).is_some()).is_some();
 
     if translate_output {
         // run the subprocess and capture its output
