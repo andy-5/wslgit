@@ -11,6 +11,7 @@
 
 - Support git commands in any argument position when deciding wether to
   translate paths in the output of the command.
+- Fix incorrectly quoted arguments with spaces in non-interactive setup.
 
 ### Changed
 
