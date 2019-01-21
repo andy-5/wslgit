@@ -42,8 +42,13 @@ Git plugin cannot correctly parse the output.
 
 ## Usage from the command line
 
-Just put the executable somewhere on your `PATH` and optionally rename it
-to `git.exe`. You can then just run any git command from a Windows console
+Put the directory containing the executable somewhere on your Windows `Path`
+environment variable and optionally rename `wslgit.exe` to `git.exe`.
+To change the environment variable, type
+`Edit environment variables for your account` into Start menu/Windows search
+and use that tool to edit `Path`.
+
+You can then just run any git command from a Windows console
 by running `wslgit COMMAND` or `git COMMAND` and it uses the Git version
 installed in WSL.
 
