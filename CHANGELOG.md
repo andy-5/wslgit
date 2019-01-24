@@ -1,6 +1,6 @@
 # WSLGit Changelog
 
-## [0.7.0] - unreleased
+## [0.7.0] - 2019-01-24
 
 ### Added
 
