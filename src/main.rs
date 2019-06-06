@@ -118,16 +118,17 @@ fn main() {
 
     // process git command arguments
     git_args.extend(env::args().skip(1)
-        .map(translate_path_to_unix));
+        .map(translate_path_to_unix)
+        .map(shell_escape)
+    );
+    git_cmd = git_args.join(" ");
 
     if use_interactive_shell() {
         cmd_args.push("bash".to_string());
         cmd_args.push("-ic".to_string());
-        git_cmd = git_args.into_iter().map(shell_escape).collect::<Vec<String>>().join(" ");
         cmd_args.push(git_cmd.clone());
     }
     else {
-        git_cmd = git_args.join(" ");
         cmd_args = git_args;
     }
 
