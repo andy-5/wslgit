@@ -79,16 +79,22 @@ fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {
     WSLPATH_RE.replace_all(line, &b"${drive}:${path}"[..])
 }
 
-fn shell_escape(arg: String) -> String {
-    // ToDo: This really only handles arguments with spaces and newlines.
-    // More complete shell escaping is required for the general case.
-    if arg.contains(" ") {
-        return vec![
-            String::from("\""),
-            arg,
-            String::from("\"")].join("");
+fn invalid_character(ch: char) -> bool {
+    match ch {
+        ' ' | '(' | ')' | '|' => true,
+        _ => false,
     }
-    arg.replace("\n", "$'\n'")
+}
+
+fn shell_escape(arg: String) -> String {
+    let mut argument: String = arg.replace("\n", "$'\n'");
+
+    if arg.contains(invalid_character) &&
+        !arg.starts_with("--") {
+        argument = format!("\'{}\'", argument);
+    }
+
+    return argument;
 }
 
 fn use_interactive_shell() -> bool {
