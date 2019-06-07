@@ -194,6 +194,52 @@ fn main() {
     }
 }
 
+#[test]
+fn test_shell_escape_newline() {
+    assert_eq!(
+        shell_escape("ab\ncdef".to_string()),
+        "ab$\'\n\'cdef");
+    assert_eq!(
+        shell_escape("ab\ncd ef".to_string()),
+        "'ab$\'\n\'cd ef'");
+    // Long arguments with newlines...
+    assert_eq!(
+        shell_escape("--ab\ncdef".to_string()),
+        "--ab$\'\n\'cdef");
+    assert_eq!(
+        shell_escape("--ab\ncd ef".to_string()),
+        "--ab$\'\n\'cd ef");
+}
+
+#[test]
+fn test_shell_escape_invalid_character() {
+    assert_eq!(
+        shell_escape("abc def".to_string()),
+        "'abc def'");
+    assert_eq!(
+        shell_escape("abc(def".to_string()),
+        "'abc(def'");
+    assert_eq!(
+        shell_escape("abc)def".to_string()),
+        "'abc)def'");
+    assert_eq!(
+        shell_escape("abc|def".to_string()),
+        "'abc|def'");
+    // Long arguments should not be quoted.
+    assert_eq!(
+        shell_escape("--abc def".to_string()),
+        "--abc def");
+    // Long arguments with invalid characters...
+    assert_eq!(
+        shell_escape("--abc(def".to_string()),
+        "--abc(def");
+    assert_eq!(
+        shell_escape("--abc)def".to_string()),
+        "--abc)def");
+    assert_eq!(
+        shell_escape("--abc|def".to_string()),
+        "--abc|def");
+}
 
 #[test]
 fn win_to_unix_path_trans() {
