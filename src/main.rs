@@ -115,13 +115,8 @@ fn use_interactive_shell() -> bool {
 
 fn main() {
     let mut cmd_args = Vec::new();
-    let cwd_unix =
-        translate_path_to_unix(env::current_dir().unwrap().to_string_lossy().into_owned());
     let mut git_args: Vec<String> = vec![
-        String::from("cd"),
-        cwd_unix,
-        String::from("&&"),
-        String::from("git"),
+        String::from("git")
     ];
     let git_cmd: String;
 
