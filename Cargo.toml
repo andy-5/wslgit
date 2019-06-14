@@ -1,9 +1,9 @@
 [package]
 name = "wslgit"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Andreas Riffnaller-Schiefer <andreas.schiefer@gmail.com>"]
 license = "MIT"
 
 [dependencies]
-regex = "1.0"
-lazy_static = "1.1"
+regex = "1"
+lazy_static = "1.3"
