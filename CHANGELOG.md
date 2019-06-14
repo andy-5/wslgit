@@ -1,5 +1,17 @@
 # WSLGit Changelog
 
+
+## [0.8.0] - unreleased
+
+### Fixed
+
+- Improve shell escaping of invalid characters (#73, #74).
+
+### Changed
+
+- Format code using `rustfmt`.
+
+
 ## [0.7.0] - 2019-01-24
 
 ### Added
