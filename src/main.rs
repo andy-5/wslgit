@@ -205,79 +205,103 @@ fn main() {
     }
 }
 
-#[test]
-fn test_shell_escape_newline() {
-    assert_eq!(shell_escape("ab\ncdef".to_string()), "ab$\'\n\'cdef");
-    assert_eq!(shell_escape("ab\ncd ef".to_string()), "'ab$\'\n\'cd ef'");
-    // Long arguments with newlines...
-    assert_eq!(shell_escape("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
-    assert_eq!(shell_escape("--ab\ncd ef".to_string()), "--ab$\'\n\'cd ef");
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn shell_escape_newline() {
+        assert_eq!(shell_escape("ab\ncdef".to_string()), "ab$\'\n\'cdef");
+        assert_eq!(shell_escape("ab\ncd ef".to_string()), "ab$\'\n\'cd ef");
+        // Long arguments with newlines...
+        assert_eq!(shell_escape("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
+        assert_eq!(shell_escape("--ab\ncd ef".to_string()), "--ab$\'\n\'cd ef");
+    }
 
-#[test]
-fn test_shell_escape_invalid_character() {
-    assert_eq!(shell_escape("abc def".to_string()), "'abc def'");
-    assert_eq!(shell_escape("abc(def".to_string()), "'abc(def'");
-    assert_eq!(shell_escape("abc)def".to_string()), "'abc)def'");
-    assert_eq!(shell_escape("abc|def".to_string()), "'abc|def'");
-    // Long arguments should not be quoted.
-    assert_eq!(shell_escape("--abc def".to_string()), "--abc def");
-    // Long arguments with invalid characters...
-    assert_eq!(shell_escape("--abc(def".to_string()), "--abc(def");
-    assert_eq!(shell_escape("--abc)def".to_string()), "--abc)def");
-    assert_eq!(shell_escape("--abc|def".to_string()), "--abc|def");
-}
+    #[test]
+    fn shell_escape_invalid_character() {
+        assert_eq!(shell_escape("abc def".to_string()), "abc def");
+        assert_eq!(shell_escape("abc(def".to_string()), "'abc(def'");
+        assert_eq!(shell_escape("abc)def".to_string()), "'abc)def'");
+        assert_eq!(shell_escape("abc|def".to_string()), "'abc|def'");
+        assert_eq!(
+            shell_escape("user.(name|email)".to_string()),
+            "'user.(name|email)'"
+        );
+    }
 
-#[test]
-fn win_to_unix_path_trans() {
-    assert_eq!(
-        translate_path_to_unix("d:\\test\\file.txt".to_string()),
-        "/mnt/d/test/file.txt"
-    );
-    assert_eq!(
-        translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
-        "/mnt/c/Users/test/a space.txt"
-    );
-}
+    #[test]
+    fn shell_escape_invalid_character_in_long_argument() {
+        assert_eq!(shell_escape("--abc def".to_string()), "--abc def");
+        assert_eq!(shell_escape("--abc=def".to_string()), "--abc=def");
+        assert_eq!(shell_escape("--abc=d ef".to_string()), "--abc=d ef");
+        assert_eq!(shell_escape("--abc=d(ef".to_string()), "--abc=d(ef ");
+        assert_eq!(shell_escape("--abc=d)ef".to_string()), "--abc=d)ef ");
+        assert_eq!(shell_escape("--abc=d|ef".to_string()), "--abc=d|ef ");
+        assert_eq!(
+            shell_escape("--pretty=format:a(b|c)d".to_string()),
+            "--pretty=format:a(b|c)d "
+        );
+        assert_eq!(
+            shell_escape("--pretty=format:a (b | c) d".to_string()),
+            "--pretty=format:a (b | c) d"
+        );
+        // Long arguments with invalid characters in argument name
+        assert_eq!(shell_escape("--abc(def".to_string()), "--abc(def ");
+        assert_eq!(shell_escape("--abc)def".to_string()), "--abc)def ");
+        assert_eq!(shell_escape("--abc|def".to_string()), "--abc|def ");
+    }
 
-#[test]
-fn unix_to_win_path_trans() {
-    assert_eq!(
-        &*translate_path_to_win(b"/mnt/d/some path/a file.md"),
-        b"d:/some path/a file.md"
-    );
-    assert_eq!(
-        &*translate_path_to_win(b"origin  /mnt/c/path/ (fetch)"),
-        b"origin  c:/path/ (fetch)"
-    );
-    let multiline = b"mirror  /mnt/c/other/ (fetch)\nmirror  /mnt/c/other/ (push)\n";
-    let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
-    assert_eq!(
-        &*translate_path_to_win(&multiline[..]),
-        &multiline_result[..]
-    );
-}
+    #[test]
+    fn win_to_unix_path_trans() {
+        assert_eq!(
+            translate_path_to_unix("d:\\test\\file.txt".to_string()),
+            "/mnt/d/test/file.txt"
+        );
+        assert_eq!(
+            translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
+            "/mnt/c/Users/test/a space.txt"
+        );
+    }
 
-#[test]
-fn no_path_translation() {
-    assert_eq!(
-        &*translate_path_to_win(b"/mnt/other/file.sh"),
-        b"/mnt/other/file.sh"
-    );
-}
+    #[test]
+    fn unix_to_win_path_trans() {
+        assert_eq!(
+            &*translate_path_to_win(b"/mnt/d/some path/a file.md"),
+            b"d:/some path/a file.md"
+        );
+        assert_eq!(
+            &*translate_path_to_win(b"origin  /mnt/c/path/ (fetch)"),
+            b"origin  c:/path/ (fetch)"
+        );
+        let multiline = b"mirror  /mnt/c/other/ (fetch)\nmirror  /mnt/c/other/ (push)\n";
+        let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
+        assert_eq!(
+            &*translate_path_to_win(&multiline[..]),
+            &multiline_result[..]
+        );
+    }
 
-#[test]
-fn relative_path_translation() {
-    assert_eq!(
-        translate_path_to_unix(".\\src\\main.rs".to_string()),
-        "./src/main.rs"
-    );
-}
+    #[test]
+    fn no_path_translation() {
+        assert_eq!(
+            &*translate_path_to_win(b"/mnt/other/file.sh"),
+            b"/mnt/other/file.sh"
+        );
+    }
 
-#[test]
-fn long_argument_path_translation() {
-    assert_eq!(
-        translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
-        "--file=/mnt/c/some/path.txt"
-    );
+    #[test]
+    fn relative_path_translation() {
+        assert_eq!(
+            translate_path_to_unix(".\\src\\main.rs".to_string()),
+            "./src/main.rs"
+        );
+    }
+
+    #[test]
+    fn long_argument_path_translation() {
+        assert_eq!(
+            translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
+            "--file=/mnt/c/some/path.txt"
+        );
+    }
 }
