@@ -76,18 +76,31 @@ fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {
 
 fn invalid_character(ch: char) -> bool {
     match ch {
-        ' ' | '(' | ')' | '|' => true,
+        '(' | ')' | '|' => true,
         _ => false,
     }
 }
 
 fn shell_escape(arg: String) -> String {
-    let mut argument: String = arg.replace("\n", "$'\n'");
+    let argument: String = arg.replace("\n", "$'\n'");
 
-    if arg.contains(invalid_character) && !arg.starts_with("--") {
-        argument = format!("\'{}\'", argument);
+    // If an argument string contains a space character then it is correctly quoted
+    // somewhere else, unknown where (when process is spawned? by std::process::Command? by wsl.exe?),
+    // and it must not be quoted here because then the extra quotes will be part of the argument string.
+    if arg.contains(invalid_character) && !arg.contains(" ") {
+        if arg.starts_with("--") {
+            // --argname[=value], long argument with an optional value.
+            // If a long argument string contains invalid characters but no space, just append a space.
+            return format!("{} ", argument);
+        } else if arg.starts_with("-") {
+            // -X[value], flag with value directly after (no space between).
+            // todo Is this correct? Need to find a flag argument that takes a string and test.
+            return format!("{} ", argument);
+        } else {
+            // Any other arguments should just be quoted.
+            return format!("'{}'", argument);
+        }
     }
-
     return argument;
 }
 
@@ -115,9 +128,7 @@ fn use_interactive_shell() -> bool {
 
 fn main() {
     let mut cmd_args = Vec::new();
-    let mut git_args: Vec<String> = vec![
-        String::from("git")
-    ];
+    let mut git_args: Vec<String> = vec![String::from("git")];
     let git_cmd: String;
 
     // process git command arguments
@@ -200,79 +211,103 @@ fn main() {
     }
 }
 
-#[test]
-fn test_shell_escape_newline() {
-    assert_eq!(shell_escape("ab\ncdef".to_string()), "ab$\'\n\'cdef");
-    assert_eq!(shell_escape("ab\ncd ef".to_string()), "'ab$\'\n\'cd ef'");
-    // Long arguments with newlines...
-    assert_eq!(shell_escape("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
-    assert_eq!(shell_escape("--ab\ncd ef".to_string()), "--ab$\'\n\'cd ef");
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn shell_escape_newline() {
+        assert_eq!(shell_escape("ab\ncdef".to_string()), "ab$\'\n\'cdef");
+        assert_eq!(shell_escape("ab\ncd ef".to_string()), "ab$\'\n\'cd ef");
+        // Long arguments with newlines...
+        assert_eq!(shell_escape("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
+        assert_eq!(shell_escape("--ab\ncd ef".to_string()), "--ab$\'\n\'cd ef");
+    }
 
-#[test]
-fn test_shell_escape_invalid_character() {
-    assert_eq!(shell_escape("abc def".to_string()), "'abc def'");
-    assert_eq!(shell_escape("abc(def".to_string()), "'abc(def'");
-    assert_eq!(shell_escape("abc)def".to_string()), "'abc)def'");
-    assert_eq!(shell_escape("abc|def".to_string()), "'abc|def'");
-    // Long arguments should not be quoted.
-    assert_eq!(shell_escape("--abc def".to_string()), "--abc def");
-    // Long arguments with invalid characters...
-    assert_eq!(shell_escape("--abc(def".to_string()), "--abc(def");
-    assert_eq!(shell_escape("--abc)def".to_string()), "--abc)def");
-    assert_eq!(shell_escape("--abc|def".to_string()), "--abc|def");
-}
+    #[test]
+    fn shell_escape_invalid_character() {
+        assert_eq!(shell_escape("abc def".to_string()), "abc def");
+        assert_eq!(shell_escape("abc(def".to_string()), "'abc(def'");
+        assert_eq!(shell_escape("abc)def".to_string()), "'abc)def'");
+        assert_eq!(shell_escape("abc|def".to_string()), "'abc|def'");
+        assert_eq!(
+            shell_escape("user.(name|email)".to_string()),
+            "'user.(name|email)'"
+        );
+    }
 
-#[test]
-fn win_to_unix_path_trans() {
-    assert_eq!(
-        translate_path_to_unix("d:\\test\\file.txt".to_string()),
-        "/mnt/d/test/file.txt"
-    );
-    assert_eq!(
-        translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
-        "/mnt/c/Users/test/a space.txt"
-    );
-}
+    #[test]
+    fn shell_escape_invalid_character_in_long_argument() {
+        assert_eq!(shell_escape("--abc def".to_string()), "--abc def");
+        assert_eq!(shell_escape("--abc=def".to_string()), "--abc=def");
+        assert_eq!(shell_escape("--abc=d ef".to_string()), "--abc=d ef");
+        assert_eq!(shell_escape("--abc=d(ef".to_string()), "--abc=d(ef ");
+        assert_eq!(shell_escape("--abc=d)ef".to_string()), "--abc=d)ef ");
+        assert_eq!(shell_escape("--abc=d|ef".to_string()), "--abc=d|ef ");
+        assert_eq!(
+            shell_escape("--pretty=format:a(b|c)d".to_string()),
+            "--pretty=format:a(b|c)d "
+        );
+        assert_eq!(
+            shell_escape("--pretty=format:a (b | c) d".to_string()),
+            "--pretty=format:a (b | c) d"
+        );
+        // Long arguments with invalid characters in argument name
+        assert_eq!(shell_escape("--abc(def".to_string()), "--abc(def ");
+        assert_eq!(shell_escape("--abc)def".to_string()), "--abc)def ");
+        assert_eq!(shell_escape("--abc|def".to_string()), "--abc|def ");
+    }
 
-#[test]
-fn unix_to_win_path_trans() {
-    assert_eq!(
-        &*translate_path_to_win(b"/mnt/d/some path/a file.md"),
-        b"d:/some path/a file.md"
-    );
-    assert_eq!(
-        &*translate_path_to_win(b"origin  /mnt/c/path/ (fetch)"),
-        b"origin  c:/path/ (fetch)"
-    );
-    let multiline = b"mirror  /mnt/c/other/ (fetch)\nmirror  /mnt/c/other/ (push)\n";
-    let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
-    assert_eq!(
-        &*translate_path_to_win(&multiline[..]),
-        &multiline_result[..]
-    );
-}
+    #[test]
+    fn win_to_unix_path_trans() {
+        assert_eq!(
+            translate_path_to_unix("d:\\test\\file.txt".to_string()),
+            "/mnt/d/test/file.txt"
+        );
+        assert_eq!(
+            translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
+            "/mnt/c/Users/test/a space.txt"
+        );
+    }
 
-#[test]
-fn no_path_translation() {
-    assert_eq!(
-        &*translate_path_to_win(b"/mnt/other/file.sh"),
-        b"/mnt/other/file.sh"
-    );
-}
+    #[test]
+    fn unix_to_win_path_trans() {
+        assert_eq!(
+            &*translate_path_to_win(b"/mnt/d/some path/a file.md"),
+            b"d:/some path/a file.md"
+        );
+        assert_eq!(
+            &*translate_path_to_win(b"origin  /mnt/c/path/ (fetch)"),
+            b"origin  c:/path/ (fetch)"
+        );
+        let multiline = b"mirror  /mnt/c/other/ (fetch)\nmirror  /mnt/c/other/ (push)\n";
+        let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
+        assert_eq!(
+            &*translate_path_to_win(&multiline[..]),
+            &multiline_result[..]
+        );
+    }
 
-#[test]
-fn relative_path_translation() {
-    assert_eq!(
-        translate_path_to_unix(".\\src\\main.rs".to_string()),
-        "./src/main.rs"
-    );
-}
+    #[test]
+    fn no_path_translation() {
+        assert_eq!(
+            &*translate_path_to_win(b"/mnt/other/file.sh"),
+            b"/mnt/other/file.sh"
+        );
+    }
 
-#[test]
-fn long_argument_path_translation() {
-    assert_eq!(
-        translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
-        "--file=/mnt/c/some/path.txt"
-    );
+    #[test]
+    fn relative_path_translation() {
+        assert_eq!(
+            translate_path_to_unix(".\\src\\main.rs".to_string()),
+            "./src/main.rs"
+        );
+    }
+
+    #[test]
+    fn long_argument_path_translation() {
+        assert_eq!(
+            translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
+            "--file=/mnt/c/some/path.txt"
+        );
+    }
 }
