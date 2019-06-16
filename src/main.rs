@@ -5,8 +5,6 @@ use std::io::{self, Write};
 use std::path::{Component, Path, Prefix, PrefixComponent};
 use std::process::{Command, Stdio};
 
-#[macro_use]
-extern crate lazy_static;
 extern crate regex;
 use regex::bytes::Regex;
 
@@ -79,11 +77,15 @@ fn translate_path_to_unix(argument: String) -> String {
 }
 
 fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {
-    lazy_static! {
-        static ref WSLPATH_RE: Regex = Regex::new(r"(?m-u)/mnt/(?P<drive>[A-Za-z])(?P<path>/\S*)")
-            .expect("Failed to compile WSLPATH regex");
-    }
-    WSLPATH_RE.replace_all(line, &b"${drive}:${path}"[..])
+    let wslpath_re: Regex = Regex::new(
+        format!(
+            r"(?m-u){}(?P<drive>[A-Za-z])(?P<path>/[[:^space:]]*)",
+            mount_root()
+        )
+        .as_str(),
+    )
+    .expect("Failed to compile WSLPATH regex");
+    wslpath_re.replace_all(line, &b"${drive}:${path}"[..])
 }
 
 fn escape_newline(arg: String) -> String {
@@ -325,6 +327,7 @@ mod tests {
 
     #[test]
     fn unix_to_win_path_trans() {
+        env::remove_var("WSLGIT_MOUNT_ROOT");
         assert_eq!(
             &*translate_path_to_win(b"/mnt/d/some path/a file.md"),
             b"d:/some path/a file.md"
@@ -334,6 +337,38 @@ mod tests {
             b"origin  c:/path/ (fetch)"
         );
         let multiline = b"mirror  /mnt/c/other/ (fetch)\nmirror  /mnt/c/other/ (push)\n";
+        let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
+        assert_eq!(
+            &*translate_path_to_win(&multiline[..]),
+            &multiline_result[..]
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
+        assert_eq!(
+            &*translate_path_to_win(b"/abc/d/some path/a file.md"),
+            b"d:/some path/a file.md"
+        );
+        assert_eq!(
+            &*translate_path_to_win(b"origin  /abc/c/path/ (fetch)"),
+            b"origin  c:/path/ (fetch)"
+        );
+        let multiline = b"mirror  /abc/c/other/ (fetch)\nmirror  /abc/c/other/ (push)\n";
+        let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
+        assert_eq!(
+            &*translate_path_to_win(&multiline[..]),
+            &multiline_result[..]
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/");
+        assert_eq!(
+            &*translate_path_to_win(b"/d/some path/a file.md"),
+            b"d:/some path/a file.md"
+        );
+        assert_eq!(
+            &*translate_path_to_win(b"origin  /c/path/ (fetch)"),
+            b"origin  c:/path/ (fetch)"
+        );
+        let multiline = b"mirror  /c/other/ (fetch)\nmirror  /c/other/ (push)\n";
         let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
         assert_eq!(
             &*translate_path_to_win(&multiline[..]),
