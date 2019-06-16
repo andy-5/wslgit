@@ -23,6 +23,19 @@ fn get_drive_letter(pc: &PrefixComponent) -> Option<String> {
     })
 }
 
+fn mount_root() -> String {
+    match env::var("WSLGIT_MOUNT_ROOT") {
+        Ok(val) => {
+            if val.ends_with("/") {
+                return val;
+            } else {
+                return format!("{}/", val);
+            }
+        }
+        Err(_e) => return "/mnt/".to_string(),
+    }
+}
+
 fn get_prefix_for_drive(drive: &str) -> String {
     // todo - lookup mount points
     format!("/mnt/{}", drive)
@@ -206,6 +219,22 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mount_root_test() {
+        env::remove_var("WSLGIT_MOUNT_ROOT");
+        assert_eq!(mount_root(), "/mnt/");
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
+        assert_eq!(mount_root(), "/abc/");
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/abc");
+        assert_eq!(mount_root(), "/abc/");
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/");
+        assert_eq!(mount_root(), "/");
+    }
+
     #[test]
     fn escape_newline() {
         assert_eq!(
