@@ -104,3 +104,12 @@ cargo build --release
 inside the root directory of this project. The resulting binary will
 be located in `./target/release/`.
 
+Tests **must** be run using one test thread because of race conditions when changing environment variables:
+```bash
+# Run all tests
+cargo test -- --test-threads=1
+# Run only unit tests
+cargo test test -- --test-threads=1
+# Run only integration tests
+cargo test integration -- --test-threads=1
+```
