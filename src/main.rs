@@ -37,8 +37,7 @@ fn mount_root() -> String {
 }
 
 fn get_prefix_for_drive(drive: &str) -> String {
-    // todo - lookup mount points
-    format!("/mnt/{}", drive)
+    format!("{}{}", mount_root(), drive)
 }
 
 fn translate_path_to_unix(argument: String) -> String {
@@ -293,6 +292,7 @@ mod tests {
 
     #[test]
     fn win_to_unix_path_trans() {
+        env::remove_var("WSLGIT_MOUNT_ROOT");
         assert_eq!(
             translate_path_to_unix("d:\\test\\file.txt".to_string()),
             "/mnt/d/test/file.txt"
@@ -300,6 +300,26 @@ mod tests {
         assert_eq!(
             translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
             "/mnt/c/Users/test/a space.txt"
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
+        assert_eq!(
+            translate_path_to_unix("d:\\test\\file.txt".to_string()),
+            "/abc/d/test/file.txt"
+        );
+        assert_eq!(
+            translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
+            "/abc/c/Users/test/a space.txt"
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/");
+        assert_eq!(
+            translate_path_to_unix("d:\\test\\file.txt".to_string()),
+            "/d/test/file.txt"
+        );
+        assert_eq!(
+            translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
+            "/c/Users/test/a space.txt"
         );
     }
 
@@ -331,6 +351,19 @@ mod tests {
 
     #[test]
     fn relative_path_translation() {
+        env::remove_var("WSLGIT_MOUNT_ROOT");
+        assert_eq!(
+            translate_path_to_unix(".\\src\\main.rs".to_string()),
+            "./src/main.rs"
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
+        assert_eq!(
+            translate_path_to_unix(".\\src\\main.rs".to_string()),
+            "./src/main.rs"
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/");
         assert_eq!(
             translate_path_to_unix(".\\src\\main.rs".to_string()),
             "./src/main.rs"
@@ -339,9 +372,22 @@ mod tests {
 
     #[test]
     fn long_argument_path_translation() {
+        env::remove_var("WSLGIT_MOUNT_ROOT");
         assert_eq!(
             translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
             "--file=/mnt/c/some/path.txt"
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
+        assert_eq!(
+            translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
+            "--file=/abc/c/some/path.txt"
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/");
+        assert_eq!(
+            translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
+            "--file=/c/some/path.txt"
         );
     }
 }
