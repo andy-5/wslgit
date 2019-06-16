@@ -40,7 +40,7 @@ fn get_prefix_for_drive(drive: &str) -> String {
 
 fn translate_path_to_unix(argument: String) -> String {
     {
-        let (argname, arg) = if argument.starts_with("--") && argument.contains('=') {
+        let (argname, arg) = if argument.contains('=') {
             let parts: Vec<&str> = argument.splitn(2, '=').collect();
             (format!("{}=", parts[0]), parts[1])
         } else {
@@ -406,11 +406,16 @@ mod tests {
     }
 
     #[test]
-    fn long_argument_path_translation() {
+    fn arguments_path_translation() {
         env::remove_var("WSLGIT_MOUNT_ROOT");
         assert_eq!(
             translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
             "--file=/mnt/c/some/path.txt"
+        );
+
+        assert_eq!(
+            translate_path_to_unix("-c core.editor=C:\\some\\editor.exe".to_owned()),
+            "-c core.editor=/mnt/c/some/editor.exe"
         );
 
         env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
@@ -419,10 +424,20 @@ mod tests {
             "--file=/abc/c/some/path.txt"
         );
 
+        assert_eq!(
+            translate_path_to_unix("-c core.editor=C:\\some\\editor.exe".to_owned()),
+            "-c core.editor=/abc/c/some/editor.exe"
+        );
+
         env::set_var("WSLGIT_MOUNT_ROOT", "/");
         assert_eq!(
             translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
             "--file=/c/some/path.txt"
+        );
+
+        assert_eq!(
+            translate_path_to_unix("-c core.editor=C:\\some\\editor.exe".to_owned()),
+            "-c core.editor=/c/some/editor.exe"
         );
     }
 }
