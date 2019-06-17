@@ -81,9 +81,35 @@ fn invalid_character(ch: char) -> bool {
     }
 }
 
-fn shell_escape(arg: String) -> String {
-    let argument: String = arg.replace("\n", "$'\n'");
+fn quotes(ch: char) -> bool {
+    match ch {
+        '\"' | '\'' => true,
+        _ => false,
+    }
+}
 
+fn escape_newline(arg: String) -> String {
+    arg.replace("\n", "$'\n'")
+}
+
+fn format_argument_for_interactive_shell(arg: String) -> String {
+    if arg.contains(quotes) {
+        // if argument contains quotes then assume it is correctly quoted.
+        return arg;
+    } else if arg.contains(invalid_character) || arg.contains(" ") {
+        return format!("'{}'", arg);
+    } else {
+        return arg;
+    }
+}
+
+fn format_argument_for_non_interactive_shell(argument: String) -> String {
+    let mut arg: String = argument;
+
+    // argument can not contain quotes since they will then be inside the outer quoting
+    if arg.contains(quotes) {
+        arg = arg.replace(quotes, "");
+    }
     // If an argument string contains a space character then it is correctly quoted
     // somewhere else, unknown where (when process is spawned? by std::process::Command? by wsl.exe?),
     // and it must not be quoted here because then the extra quotes will be part of the argument string.
@@ -91,17 +117,17 @@ fn shell_escape(arg: String) -> String {
         if arg.starts_with("--") {
             // --argname[=value], long argument with an optional value.
             // If a long argument string contains invalid characters but no space, just append a space.
-            return format!("{} ", argument);
+            return format!("{} ", arg);
         } else if arg.starts_with("-") {
             // -X[value], flag with value directly after (no space between).
             // todo Is this correct? Need to find a flag argument that takes a string and test.
-            return format!("{} ", argument);
+            return format!("{} ", arg);
         } else {
             // Any other arguments should just be quoted.
-            return format!("'{}'", argument);
+            return format!("'{}'", arg);
         }
     }
-    return argument;
+    return arg;
 }
 
 fn use_interactive_shell() -> bool {
@@ -137,21 +163,32 @@ fn main() {
         String::from("git"),
     ];
     let git_cmd: String;
-
-    // process git command arguments
-    git_args.extend(
-        env::args()
-            .skip(1)
-            .map(translate_path_to_unix)
-            .map(shell_escape),
-    );
-    git_cmd = git_args.join(" ");
+    let args: Vec<String> = env::args()
+        .skip(1)
+        .map(translate_path_to_unix)
+        .collect::<Vec<String>>();
 
     if use_interactive_shell() {
         cmd_args.push("bash".to_string());
         cmd_args.push("-ic".to_string());
+
+        git_args.extend(
+            args.into_iter()
+                .map(format_argument_for_interactive_shell)
+                .map(escape_newline)
+                .collect::<Vec<String>>(),
+        );
+
+        git_cmd = git_args.join(" ");
         cmd_args.push(git_cmd.clone());
     } else {
+        git_args.extend(
+            args.into_iter()
+                .map(format_argument_for_non_interactive_shell)
+                .map(escape_newline)
+                .collect::<Vec<String>>(),
+        );
+        git_cmd = git_args.join(" ");
         cmd_args = git_args;
     }
 
@@ -222,46 +259,128 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
-    fn shell_escape_newline() {
-        assert_eq!(shell_escape("ab\ncdef".to_string()), "ab$\'\n\'cdef");
-        assert_eq!(shell_escape("ab\ncd ef".to_string()), "ab$\'\n\'cd ef");
+    fn escape_newline_test() {
+        assert_eq!(escape_newline("ab\ncdef".to_string()), "ab$\'\n\'cdef");
+        assert_eq!(escape_newline("ab\ncd ef".to_string()), "ab$\'\n\'cd ef");
         // Long arguments with newlines...
-        assert_eq!(shell_escape("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
-        assert_eq!(shell_escape("--ab\ncd ef".to_string()), "--ab$\'\n\'cd ef");
-    }
-
-    #[test]
-    fn shell_escape_invalid_character() {
-        assert_eq!(shell_escape("abc def".to_string()), "abc def");
-        assert_eq!(shell_escape("abc(def".to_string()), "'abc(def'");
-        assert_eq!(shell_escape("abc)def".to_string()), "'abc)def'");
-        assert_eq!(shell_escape("abc|def".to_string()), "'abc|def'");
+        assert_eq!(escape_newline("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
         assert_eq!(
-            shell_escape("user.(name|email)".to_string()),
-            "'user.(name|email)'"
+            escape_newline("--ab\ncd ef".to_string()),
+            "--ab$\'\n\'cd ef"
         );
     }
 
     #[test]
-    fn shell_escape_invalid_character_in_long_argument() {
-        assert_eq!(shell_escape("--abc def".to_string()), "--abc def");
-        assert_eq!(shell_escape("--abc=def".to_string()), "--abc=def");
-        assert_eq!(shell_escape("--abc=d ef".to_string()), "--abc=d ef");
-        assert_eq!(shell_escape("--abc=d(ef".to_string()), "--abc=d(ef ");
-        assert_eq!(shell_escape("--abc=d)ef".to_string()), "--abc=d)ef ");
-        assert_eq!(shell_escape("--abc=d|ef".to_string()), "--abc=d|ef ");
+    fn format_argument_for_interactive_shell_test() {
         assert_eq!(
-            shell_escape("--pretty=format:a(b|c)d".to_string()),
+            format_argument_for_interactive_shell("abcdef".to_string()),
+            "abcdef"
+        );
+        assert_eq!(
+            format_argument_for_interactive_shell("abc def".to_string()),
+            "'abc def'"
+        );
+        assert_eq!(
+            format_argument_for_interactive_shell("abc(def".to_string()),
+            "'abc(def'"
+        );
+        assert_eq!(
+            format_argument_for_interactive_shell("abc)def".to_string()),
+            "'abc)def'"
+        );
+        assert_eq!(
+            format_argument_for_interactive_shell("abc|def".to_string()),
+            "'abc|def'"
+        );
+        assert_eq!(
+            format_argument_for_interactive_shell("user.(name|email)".to_string()),
+            "'user.(name|email)'"
+        );
+        assert_eq!(
+            format_argument_for_interactive_shell("ab\"(c|d)\'ef".to_string()),
+            "ab\"(c|d)\'ef"
+        );
+    }
+
+    #[test]
+    fn format_argument_for_non_interactive_shell_with_invalid_character() {
+        assert_eq!(
+            format_argument_for_non_interactive_shell("abc def".to_string()),
+            "abc def"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("abc(def".to_string()),
+            "'abc(def'"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("abc)def".to_string()),
+            "'abc)def'"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("abc|def".to_string()),
+            "'abc|def'"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("user.(name|email)".to_string()),
+            "'user.(name|email)'"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("ab\"(c|d)\'ef".to_string()),
+            "'ab(c|d)ef'"
+        );
+    }
+
+    #[test]
+    fn format_argument_for_non_interactive_shell_with_invalid_character_in_long_argument() {
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc def".to_string()),
+            "--abc def"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc=def".to_string()),
+            "--abc=def"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc=\"def\'".to_string()),
+            "--abc=def"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc=d ef".to_string()),
+            "--abc=d ef"
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc=d(ef".to_string()),
+            "--abc=d(ef "
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc=d)ef".to_string()),
+            "--abc=d)ef "
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc=d|ef".to_string()),
+            "--abc=d|ef "
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--pretty=format:a(b|c)d".to_string()),
             "--pretty=format:a(b|c)d "
         );
         assert_eq!(
-            shell_escape("--pretty=format:a (b | c) d".to_string()),
+            format_argument_for_non_interactive_shell("--pretty=format:a (b | c) d".to_string()),
             "--pretty=format:a (b | c) d"
         );
         // Long arguments with invalid characters in argument name
-        assert_eq!(shell_escape("--abc(def".to_string()), "--abc(def ");
-        assert_eq!(shell_escape("--abc)def".to_string()), "--abc)def ");
-        assert_eq!(shell_escape("--abc|def".to_string()), "--abc|def ");
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc(def".to_string()),
+            "--abc(def "
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc)def".to_string()),
+            "--abc)def "
+        );
+        assert_eq!(
+            format_argument_for_non_interactive_shell("--abc|def".to_string()),
+            "--abc|def "
+        );
     }
 
     #[test]
