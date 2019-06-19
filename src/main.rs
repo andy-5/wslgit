@@ -74,21 +74,33 @@ fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {
     WSLPATH_RE.replace_all(line, &b"${drive}:${path}"[..])
 }
 
-fn invalid_character(ch: char) -> bool {
+fn escape_newline(arg: String) -> String {
+    arg.replace("\n", "$'\n'")
+}
+
+fn quote_characters(ch: char) -> bool {
+    match ch {
+        '\"' | '\'' => true,
+        _ => false,
+    }
+}
+
+fn invalid_characters(ch: char) -> bool {
     match ch {
         ' ' | '(' | ')' | '|' => true,
         _ => false,
     }
 }
 
-fn shell_escape(arg: String) -> String {
-    let mut argument: String = arg.replace("\n", "$'\n'");
-
-    if arg.contains(invalid_character) && !arg.starts_with("--") {
-        argument = format!("\'{}\'", argument);
+fn format_argument(arg: String) -> String {
+    if arg.contains(quote_characters) {
+        // if argument contains quotes then assume it is correctly quoted.
+        return arg;
+    } else if arg.contains(invalid_characters) {
+        return format!("\"{}\"", arg);
+    } else {
+        return arg;
     }
-
-    return argument;
 }
 
 fn use_interactive_shell() -> bool {
@@ -123,24 +135,25 @@ fn main() {
         String::from("&&"),
         String::from("git"),
     ];
-    let git_cmd: String;
 
-    // process git command arguments
     git_args.extend(
         env::args()
             .skip(1)
             .map(translate_path_to_unix)
-            .map(shell_escape),
+            .map(format_argument)
+            .map(escape_newline)
     );
-    git_cmd = git_args.join(" ");
 
+    let git_cmd: String = git_args.join(" ");
+
+    // build the command arguments that are passed to wsl.exe
+    cmd_args.push("bash".to_string());
     if use_interactive_shell() {
-        cmd_args.push("bash".to_string());
         cmd_args.push("-ic".to_string());
-        cmd_args.push(git_cmd.clone());
     } else {
-        cmd_args = git_args;
+        cmd_args.push("-c".to_string());
     }
+    cmd_args.push(git_cmd.clone());
 
     // setup stdin/stdout
     let stdin_mode = if env::args().last().unwrap() == "--version" {
@@ -209,46 +222,47 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
-    fn shell_escape_newline() {
-        assert_eq!(shell_escape("ab\ncdef".to_string()), "ab$\'\n\'cdef");
-        assert_eq!(shell_escape("ab\ncd ef".to_string()), "ab$\'\n\'cd ef");
+    fn escape_newline() {
+        assert_eq!(super::escape_newline("ab\ncdef".to_string()), "ab$\'\n\'cdef");
+        assert_eq!(super::escape_newline("ab\ncd ef".to_string()), "ab$\'\n\'cd ef");
         // Long arguments with newlines...
-        assert_eq!(shell_escape("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
-        assert_eq!(shell_escape("--ab\ncd ef".to_string()), "--ab$\'\n\'cd ef");
+        assert_eq!(super::escape_newline("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
+        assert_eq!(super::escape_newline("--ab\ncd ef".to_string()), "--ab$\'\n\'cd ef");
     }
 
     #[test]
-    fn shell_escape_invalid_character() {
-        assert_eq!(shell_escape("abc def".to_string()), "abc def");
-        assert_eq!(shell_escape("abc(def".to_string()), "'abc(def'");
-        assert_eq!(shell_escape("abc)def".to_string()), "'abc)def'");
-        assert_eq!(shell_escape("abc|def".to_string()), "'abc|def'");
+    fn format_argument_with_invalid_character() {
+        assert_eq!(format_argument("abc def".to_string()), "\"abc def\"");
+        assert_eq!(format_argument("abc(def".to_string()), "\"abc(def\"");
+        assert_eq!(format_argument("abc)def".to_string()), "\"abc)def\"");
+        assert_eq!(format_argument("abc|def".to_string()), "\"abc|def\"");
+        assert_eq!(format_argument("\"abc def\"".to_string()), "\"abc def\"");
         assert_eq!(
-            shell_escape("user.(name|email)".to_string()),
-            "'user.(name|email)'"
+            format_argument("user.(name|email)".to_string()),
+            "\"user.(name|email)\""
         );
     }
 
     #[test]
-    fn shell_escape_invalid_character_in_long_argument() {
-        assert_eq!(shell_escape("--abc def".to_string()), "--abc def");
-        assert_eq!(shell_escape("--abc=def".to_string()), "--abc=def");
-        assert_eq!(shell_escape("--abc=d ef".to_string()), "--abc=d ef");
-        assert_eq!(shell_escape("--abc=d(ef".to_string()), "--abc=d(ef ");
-        assert_eq!(shell_escape("--abc=d)ef".to_string()), "--abc=d)ef ");
-        assert_eq!(shell_escape("--abc=d|ef".to_string()), "--abc=d|ef ");
+    fn format_long_argument_with_invalid_character() {
+        assert_eq!(format_argument("--abc def".to_string()), "\"--abc def\"");
+        assert_eq!(format_argument("--abc=def".to_string()), "--abc=def");
+        assert_eq!(format_argument("--abc=d ef".to_string()), "\"--abc=d ef\"");
+        assert_eq!(format_argument("--abc=d(ef".to_string()), "\"--abc=d(ef\"");
+        assert_eq!(format_argument("--abc=d)ef".to_string()), "\"--abc=d)ef\"");
+        assert_eq!(format_argument("--abc=d|ef".to_string()), "\"--abc=d|ef\"");
         assert_eq!(
-            shell_escape("--pretty=format:a(b|c)d".to_string()),
-            "--pretty=format:a(b|c)d "
+            format_argument("--pretty=format:a(b|c)d".to_string()),
+            "\"--pretty=format:a(b|c)d\""
         );
         assert_eq!(
-            shell_escape("--pretty=format:a (b | c) d".to_string()),
-            "--pretty=format:a (b | c) d"
+            format_argument("--pretty=format:a (b | c) d".to_string()),
+            "\"--pretty=format:a (b | c) d\""
         );
         // Long arguments with invalid characters in argument name
-        assert_eq!(shell_escape("--abc(def".to_string()), "--abc(def ");
-        assert_eq!(shell_escape("--abc)def".to_string()), "--abc)def ");
-        assert_eq!(shell_escape("--abc|def".to_string()), "--abc|def ");
+        assert_eq!(format_argument("--abc(def".to_string()), "\"--abc(def\"");
+        assert_eq!(format_argument("--abc)def".to_string()), "\"--abc)def\"");
+        assert_eq!(format_argument("--abc|def".to_string()), "\"--abc|def\"");
     }
 
     #[test]
