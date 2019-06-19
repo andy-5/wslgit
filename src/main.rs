@@ -141,7 +141,7 @@ fn main() {
             .skip(1)
             .map(translate_path_to_unix)
             .map(format_argument)
-            .map(escape_newline)
+            .map(escape_newline),
     );
 
     let git_cmd: String = git_args.join(" ");
@@ -211,11 +211,23 @@ mod tests {
     use super::*;
     #[test]
     fn escape_newline() {
-        assert_eq!(super::escape_newline("ab\ncdef".to_string()), "ab$\'\n\'cdef");
-        assert_eq!(super::escape_newline("ab\ncd ef".to_string()), "ab$\'\n\'cd ef");
+        assert_eq!(
+            super::escape_newline("ab\ncdef".to_string()),
+            "ab$\'\n\'cdef"
+        );
+        assert_eq!(
+            super::escape_newline("ab\ncd ef".to_string()),
+            "ab$\'\n\'cd ef"
+        );
         // Long arguments with newlines...
-        assert_eq!(super::escape_newline("--ab\ncdef".to_string()), "--ab$\'\n\'cdef");
-        assert_eq!(super::escape_newline("--ab\ncd ef".to_string()), "--ab$\'\n\'cd ef");
+        assert_eq!(
+            super::escape_newline("--ab\ncdef".to_string()),
+            "--ab$\'\n\'cdef"
+        );
+        assert_eq!(
+            super::escape_newline("--ab\ncd ef".to_string()),
+            "--ab$\'\n\'cd ef"
+        );
     }
 
     #[test]
