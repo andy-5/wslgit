@@ -131,7 +131,7 @@ fn main() {
         translate_path_to_unix(env::current_dir().unwrap().to_string_lossy().into_owned());
     let mut git_args: Vec<String> = vec![
         String::from("cd"),
-        cwd_unix,
+        format!("\"{}\"", cwd_unix),
         String::from("&&"),
         String::from("git"),
     ];
@@ -156,19 +156,7 @@ fn main() {
     cmd_args.push(git_cmd.clone());
 
     // setup stdin/stdout
-    let stdin_mode = if env::args().last().unwrap() == "--version" {
-        // For some reason, the git subprocess seems to hang, waiting for
-        // input, when VS Code 1.17.2 tries to detect if `git --version` works
-        // on Windows 10 1709 (specifically, in `findSpecificGit` in the
-        // VS Code source file `extensions/git/src/git.ts`).
-        // To workaround this, we only pass stdin to the git subprocess
-        // for all other commands, but not for the initial `--version` check.
-        // Stdin is needed for example when commiting, where the commit
-        // message is passed on stdin.
-        Stdio::null()
-    } else {
-        Stdio::inherit()
-    };
+    let stdin_mode = Stdio::inherit();
 
     // setup the git subprocess launched inside WSL
     let mut git_proc_setup = Command::new("wsl");
