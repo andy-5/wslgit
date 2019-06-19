@@ -6,6 +6,7 @@ license = "MIT"
 
 [dependencies]
 regex = "1"
+lazy_static = "1.3"
 
 [dev-dependencies]
 assert_cli = "0.6"
