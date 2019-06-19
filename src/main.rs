@@ -5,6 +5,8 @@ use std::io::{self, Write};
 use std::path::{Component, Path, Prefix, PrefixComponent};
 use std::process::{Command, Stdio};
 
+#[macro_use]
+extern crate lazy_static;
 extern crate regex;
 use regex::bytes::Regex;
 
@@ -122,16 +124,19 @@ fn use_interactive_shell() -> bool {
     if let Ok(interactive_flag) = env::var("WSLGIT_USE_INTERACTIVE_SHELL") {
         if interactive_flag == "false" || interactive_flag == "0" {
             return false;
+        } else {
+            return true;
         }
     }
-    // check for advanced usage indicated by BASH_ENV and WSLENV=BASH_ENV
+    // check for advanced usage indicated by BASH_ENV and WSLENV contains BASH_ENV
     else if env::var("BASH_ENV").is_ok() {
         if let Ok(wslenv) = env::var("WSLENV") {
-            if wslenv
-                .split(':')
-                .position(|r| r.eq_ignore_ascii_case("BASH_ENV"))
-                .is_some()
-            {
+            lazy_static! {
+                // BASH_ENV must be first or after a ':', and it must have flags
+                static ref BASH_ENV_RE: Regex = Regex::new(r"(?-u)(^|:)BASH_ENV/")
+                    .expect("Failed to compile BASH_ENV regex");
+            }
+            if BASH_ENV_RE.is_match(wslenv.as_bytes()) {
                 return false;
             }
         }
@@ -234,6 +239,49 @@ mod tests {
 
         env::set_var("WSLGIT_MOUNT_ROOT", "/");
         assert_eq!(mount_root(), "/");
+    }
+
+    #[test]
+    fn use_interactive_shell_test() {
+        // default
+        env::remove_var("WSLGIT_USE_INTERACTIVE_SHELL");
+        env::remove_var("BASH_ENV");
+        env::remove_var("WSLENV");
+        assert_eq!(use_interactive_shell(), true);
+
+        // disable using WSLGIT_USE_INTERACTIVE_SHELL set to 'false' or '0'
+        env::set_var("WSLGIT_USE_INTERACTIVE_SHELL", "false");
+        assert_eq!(use_interactive_shell(), false);
+        env::set_var("WSLGIT_USE_INTERACTIVE_SHELL", "0");
+        assert_eq!(use_interactive_shell(), false);
+
+        // enable using WSLGIT_USE_INTERACTIVE_SHELL set to anything but 'false' and '0'
+        env::set_var("WSLGIT_USE_INTERACTIVE_SHELL", "true");
+        assert_eq!(use_interactive_shell(), true);
+        env::set_var("WSLGIT_USE_INTERACTIVE_SHELL", "1");
+        assert_eq!(use_interactive_shell(), true);
+
+        env::remove_var("WSLGIT_USE_INTERACTIVE_SHELL");
+
+        // just having BASH_ENV is not enough
+        env::set_var("BASH_ENV", "something");
+        assert_eq!(use_interactive_shell(), true);
+
+        // BASH_ENV must also be in WSLENV
+        env::set_var("WSLENV", "BASH_ENV/up");
+        assert_eq!(use_interactive_shell(), false);
+        env::set_var("WSLENV", "BASH_ENV/up:TMP");
+        assert_eq!(use_interactive_shell(), false);
+        env::set_var("WSLENV", "TMP:BASH_ENV/up");
+        assert_eq!(use_interactive_shell(), false);
+        env::set_var("WSLENV", "TMP:BASH_ENV/up:TMP");
+        assert_eq!(use_interactive_shell(), false);
+        env::set_var("WSLENV", "NOT_BASH_ENV/up");
+        assert_eq!(use_interactive_shell(), true);
+
+        // WSLGIT_USE_INTERACTIVE_SHELL overrides BASH_ENV
+        env::set_var("WSLGIT_USE_INTERACTIVE_SHELL", "true");
+        assert_eq!(use_interactive_shell(), true);
     }
 
     #[test]
