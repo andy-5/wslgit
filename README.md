@@ -87,8 +87,14 @@ two methods:
     from `BASH_ENV` contains everything you need, and therefore also starts
     bash in non-interactive mode.
 
-    This feature is only available in Windows 10 builds 17063 and later.
+This feature is only available in Windows 10 builds 17063 and later.
 
+## Mount Root
+
+The default mount root is `/mnt/`, but if it has been changed using `/etc/wsl.conf`
+then `wslgit` must be instructed to use the correct mount root by, in Windows,
+setting the environment variable `WSLGIT_MOUNT_ROOT` to the new root path.  
+If, for example, the mount root defined in wsl.conf is `/` then set *WSLGIT_MOUNT_ROOT* to just `/`.
 
 ## Building from source
 
