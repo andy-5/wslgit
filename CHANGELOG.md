@@ -5,11 +5,14 @@
 
 ### Fixed
 
-- Improve shell escaping of invalid characters (#73, #74).
+- Improve shell escaping of invalid characters (#27, #54, #73),
+    fixed by #74 and #76.
 
 ### Changed
 
 - Format code using `rustfmt`.
+- Unify interactive/non-interactive configurations, both use `bash -c` now.
+- Expand tests and add integration tests (#76).
 
 
 ## [0.7.0] - 2019-01-24
