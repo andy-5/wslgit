@@ -155,12 +155,9 @@ fn main() {
     }
     cmd_args.push(git_cmd.clone());
 
-    // setup stdin/stdout
-    let stdin_mode = Stdio::inherit();
-
     // setup the git subprocess launched inside WSL
     let mut git_proc_setup = Command::new("wsl");
-    git_proc_setup.args(&cmd_args).stdin(stdin_mode);
+    git_proc_setup.args(&cmd_args);
     let status;
 
     // add git commands that must use translate_path_to_win
