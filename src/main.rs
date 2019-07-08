@@ -132,8 +132,9 @@ fn use_interactive_shell() -> bool {
     else if env::var("BASH_ENV").is_ok() {
         if let Ok(wslenv) = env::var("WSLENV") {
             lazy_static! {
-                // BASH_ENV must be first or after a ':', and it must have flags
-                static ref BASH_ENV_RE: Regex = Regex::new(r"(?-u)(^|:)BASH_ENV/")
+                // BASH_ENV can be first or after another variable.
+                // It can be followed by flags, another variable or be last.
+                static ref BASH_ENV_RE: Regex = Regex::new(r"(?-u)(^|:)BASH_ENV(/|:|$)")
                     .expect("Failed to compile BASH_ENV regex");
             }
             if BASH_ENV_RE.is_match(wslenv.as_bytes()) {
@@ -268,14 +269,23 @@ mod tests {
         assert_eq!(use_interactive_shell(), true);
 
         // BASH_ENV must also be in WSLENV
+        env::set_var("WSLENV", "BASH_ENV");
+        assert_eq!(use_interactive_shell(), false);
         env::set_var("WSLENV", "BASH_ENV/up");
+        assert_eq!(use_interactive_shell(), false);
+        env::set_var("WSLENV", "BASH_ENV:TMP");
         assert_eq!(use_interactive_shell(), false);
         env::set_var("WSLENV", "BASH_ENV/up:TMP");
         assert_eq!(use_interactive_shell(), false);
+        env::set_var("WSLENV", "TMP:BASH_ENV");
+        assert_eq!(use_interactive_shell(), false);
         env::set_var("WSLENV", "TMP:BASH_ENV/up");
+        assert_eq!(use_interactive_shell(), false);
+        env::set_var("WSLENV", "TMP:BASH_ENV:TMP");
         assert_eq!(use_interactive_shell(), false);
         env::set_var("WSLENV", "TMP:BASH_ENV/up:TMP");
         assert_eq!(use_interactive_shell(), false);
+
         env::set_var("WSLENV", "NOT_BASH_ENV/up");
         assert_eq!(use_interactive_shell(), true);
 
