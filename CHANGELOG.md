@@ -3,16 +3,25 @@
 
 ## [0.8.0] - unreleased
 
+### Added
+
+- New environment variable `WSLGIT_MOUNT_ROOT` to configure the
+    WSL mount root (#78). 
+
 ### Fixed
 
 - Improve shell escaping of invalid characters (#27, #54, #73),
     fixed by #74 and #76.
+- Support flags for `BASH_ENV` in `WSLENV` environment variable (#56),
+    fixed by #78.
 
 ### Changed
 
 - Format code using `rustfmt`.
 - Unify interactive/non-interactive configurations, both use `bash -c` now.
 - Expand tests and add integration tests (#76).
+- `WSLGIT_USE_INTERACTIVE_SHELL` now has higher priority than a
+    `BASH_ENV`/`WSLENV` configuration (#78).
 
 
 ## [0.7.0] - 2019-01-24
