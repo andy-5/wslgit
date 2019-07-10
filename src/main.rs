@@ -78,16 +78,20 @@ fn translate_path_to_unix(argument: String) -> String {
     argument
 }
 
+// Translate absolute unix paths to windows paths by mapping what looks like a mounted drive ('/mnt/x') to a drive letter ('x:/').
+// The path must either be the start of a line or start with a whitespace, and
+// the path must be the end of a line, end with a / or end with a whitespace.
 fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {
     let wslpath_re: Regex = Regex::new(
         format!(
-            r"(?m-u){}(?P<drive>[A-Za-z])(?P<path>/[[:^space:]]*)",
+            r"(?m-u)(^|(?P<pre>[[:space:]])){}(?P<drive>[A-Za-z])($|/|(?P<post>[[:space:]]))",
             mount_root()
         )
         .as_str(),
     )
     .expect("Failed to compile WSLPATH regex");
-    wslpath_re.replace_all(line, &b"${drive}:${path}"[..])
+
+    wslpath_re.replace_all(line, &b"${pre}${drive}:/${post}"[..])
 }
 
 fn escape_newline(arg: String) -> String {
@@ -400,6 +404,10 @@ mod tests {
             &*translate_path_to_win(&multiline[..]),
             &multiline_result[..]
         );
+        assert_eq!(
+            &*translate_path_to_win(b"/mnt/c  /mnt/c/ /mnt/c/d /mnt/c/d/"),
+            b"c:/  c:/ c:/d c:/d/"
+        );
 
         env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
         assert_eq!(
@@ -415,6 +423,10 @@ mod tests {
         assert_eq!(
             &*translate_path_to_win(&multiline[..]),
             &multiline_result[..]
+        );
+        assert_eq!(
+            &*translate_path_to_win(b"/abc/c  /abc/c/ /abc/c/d /abc/c/d/"),
+            b"c:/  c:/ c:/d c:/d/"
         );
 
         env::set_var("WSLGIT_MOUNT_ROOT", "/");
@@ -432,13 +444,30 @@ mod tests {
             &*translate_path_to_win(&multiline[..]),
             &multiline_result[..]
         );
+        assert_eq!(
+            &*translate_path_to_win(b"/c  /c/ /c/d /c/d/"),
+            b"c:/  c:/ c:/d c:/d/"
+        );
     }
 
     #[test]
     fn no_path_translation() {
+        env::remove_var("WSLGIT_MOUNT_ROOT");
         assert_eq!(
-            &*translate_path_to_win(b"/mnt/other/file.sh"),
-            b"/mnt/other/file.sh"
+            &*translate_path_to_win(b"/mnt/other/file.sh /mnt/ab"),
+            b"/mnt/other/file.sh /mnt/ab"
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
+        assert_eq!(
+            &*translate_path_to_win(b"/abc/other/file.sh /abc/ab"),
+            b"/abc/other/file.sh /abc/ab"
+        );
+
+        env::set_var("WSLGIT_MOUNT_ROOT", "/");
+        assert_eq!(
+            &*translate_path_to_win(b"/other/file.sh /ab"),
+            b"/other/file.sh /ab"
         );
     }
 
