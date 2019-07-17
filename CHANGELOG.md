@@ -14,6 +14,7 @@
     fixed by #74 and #76.
 - Support flags for `BASH_ENV` in `WSLENV` environment variable (#56),
     fixed by #78.
+- Fixed translating to windows path from the root of a mounted drive (#80).
 
 ### Changed
 
