@@ -116,7 +116,7 @@ fn format_argument(arg: String) -> String {
     if arg.contains(quote_characters) {
         // if argument contains quotes then assume it is correctly quoted.
         return arg;
-    } else if arg.contains(invalid_characters) {
+    } else if arg.contains(invalid_characters) || arg.is_empty() {
         return format!("\"{}\"", arg);
     } else {
         return arg;
@@ -352,6 +352,11 @@ mod tests {
         assert_eq!(format_argument("--abc(def".to_string()), "\"--abc(def\"");
         assert_eq!(format_argument("--abc)def".to_string()), "\"--abc)def\"");
         assert_eq!(format_argument("--abc|def".to_string()), "\"--abc|def\"");
+    }
+
+    #[test]
+    fn format_empty_argument() {
+        assert_eq!(format_argument("".to_string()), "\"\"");
     }
 
     #[test]
