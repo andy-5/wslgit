@@ -15,6 +15,7 @@
 - Support flags for `BASH_ENV` in `WSLENV` environment variable (#56),
     fixed by #78.
 - Fixed translating to windows path from the root of a mounted drive (#80).
+- Support empty command line arguments (#84).
 
 ### Changed
 
