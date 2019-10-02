@@ -5,6 +5,7 @@ extern crate predicates;
 mod integration {
     use assert_cmd::prelude::*;
     use predicates::prelude::*;
+    use std::env;
     use std::process::Command;
 
     #[test]
@@ -160,5 +161,106 @@ mod integration {
             .assert()
             .success()
             .stdout("</f>\n<r> 01234\n<a> abcd\n");
+    }
+
+    #[test]
+    fn translate_arguments() {
+        let src_main_rel = "src\\main.rs";
+        let p = env::current_dir()
+            .unwrap()
+            .as_path()
+            .join(src_main_rel)
+            .as_path()
+            .to_string_lossy()
+            .into_owned();
+        let src_main_abs = p.as_str();
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["log", "-n1", "--oneline", "--", src_main_rel])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout(predicate::str::is_empty().not());
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["log", "-n1", "--oneline", "--", src_main_abs])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout(predicate::str::is_empty().not());
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["config", "--get-regexp", "^remote\\..*"])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout(predicate::str::is_empty().not());
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["log", "-n1", "-L", format!("1,1:{}", src_main_rel).as_str()])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "diff --git a/src/main.rs b/src/main.rs",
+            ))
+            .stdout(predicate::str::contains("@@ -0,0 +1,1 @@"));
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["log", "-n1", "-L", format!("1,1:{}", src_main_abs).as_str()])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "diff --git a/src/main.rs b/src/main.rs",
+            ))
+            .stdout(predicate::str::contains("@@ -0,0 +1,1 @@"));
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["log", "-L", format!(":main:{}", src_main_rel).as_str()])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "diff --git a/src/main.rs b/src/main.rs",
+            ))
+            .stdout(predicate::str::contains("fn main() {"));
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["log", "-L", format!(":main:{}", src_main_abs).as_str()])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(
+                "diff --git a/src/main.rs b/src/main.rs",
+            ))
+            .stdout(predicate::str::contains("fn main() {"));
+    }
+
+    #[test]
+    fn translate_output() {
+        let cwd = format!(
+            "{}\n",
+            env::current_dir()
+                .unwrap()
+                .as_path()
+                .to_string_lossy()
+                .into_owned()
+        );
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["rev-parse", "--show-toplevel"])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout(cwd);
     }
 }
