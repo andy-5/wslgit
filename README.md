@@ -118,4 +118,6 @@ cargo test -- --test-threads=1
 cargo test test -- --test-threads=1
 # Run only integration tests
 cargo test integration -- --test-threads=1
+# Run benchmarks (requires nightly toolchain!)
+cargo +nightly bench
 ```
