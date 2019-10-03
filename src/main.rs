@@ -2,26 +2,13 @@ use std::borrow::Cow;
 use std::env;
 
 use std::io::{self, Write};
-use std::path::{Component, Path, Prefix, PrefixComponent};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
 use regex::bytes::Regex;
-
-fn get_drive_letter(pc: &PrefixComponent) -> Option<String> {
-    let drive_byte = match pc.kind() {
-        Prefix::VerbatimDisk(d) => Some(d),
-        Prefix::Disk(d) => Some(d),
-        _ => None,
-    };
-    drive_byte.map(|drive_letter| {
-        String::from_utf8(vec![drive_letter])
-            .expect(&format!("Invalid drive letter: {}", drive_letter))
-            .to_lowercase()
-    })
-}
 
 fn mount_root() -> String {
     match env::var("WSLGIT_MOUNT_ROOT") {
@@ -36,46 +23,59 @@ fn mount_root() -> String {
     }
 }
 
-fn get_prefix_for_drive(drive: &str) -> String {
-    format!("{}{}", mount_root(), drive)
-}
-
 fn translate_path_to_unix(argument: String) -> String {
+    // An absolute or UNC path must:
+    // 1. Be at the beginning of the string, or after a whitespace, colon, or equal-sign.
+    // 2. Begin with <drive-letter>:\, <drive-letter>:/ or \\
+    // 3. Not contain the characters: <>:|?' or newline.
+    lazy_static! {
+        static ref ABS_WINPATH_RE: Regex = Regex::new(
+            r"(?-u)(?P<pre>^|[[:space:]]|:|=)(?P<path>([A-Z]:[\\/]|\\\\)([^<>:|?'\n]*[\\/]?)*)"
+        )
+        .expect("Failed to compile ABS_WINPATH_RE regex.");
+    }
+
+    let argument = &ABS_WINPATH_RE
+        .replace_all(argument.as_bytes(), &b"${pre}$(wslpath '${path}')"[..])
+        .into_owned();
+
+    // Relative paths that needs to have their slashes changed must:
+    // 1. Be at the beginning of the string, or after a whitespace, colon, or equal-sign.
+    // 2. Begin with a string of valid characters (except \)...
+    // 3. Followed by one \
+    // 4. And then any number of valid characters (including \).
+    lazy_static! {
+        static ref REL_WINPATH_RE: Regex = Regex::new(
+            r"(?-u)^(?P<before>[^\\]+([[:space:]]|:|=))?(?P<path>([^<>:|?'\n\\]+)\\([^<>:|?'\n]*))(?P<after>.*)"
+        )
+        .expect("Failed to compile REL_WINPATH_RE regex.");
+    }
+
     {
-        let (argname, arg) = if argument.contains('=') {
-            let parts: Vec<&str> = argument.splitn(2, '=').collect();
-            (format!("{}=", parts[0]), parts[1])
-        } else {
-            ("".to_owned(), argument.as_ref())
-        };
-        let win_path = Path::new(arg);
-        if win_path.is_absolute() || win_path.exists() {
-            let wsl_path: String = win_path.components().fold(String::new(), |mut acc, c| {
-                match c {
-                    Component::Prefix(prefix_comp) => {
-                        let d = get_drive_letter(&prefix_comp)
-                            .expect(&format!("Cannot handle path {:?}", win_path));
-                        acc.push_str(&get_prefix_for_drive(&d));
-                    }
-                    Component::RootDir => {}
-                    _ => {
-                        let d = c
-                            .as_os_str()
-                            .to_str()
-                            .expect(&format!("Cannot represent path {:?}", win_path))
-                            .to_owned();
-                        if !acc.is_empty() && !acc.ends_with('/') {
-                            acc.push('/');
-                        }
-                        acc.push_str(&d);
-                    }
+        if REL_WINPATH_RE.is_match(argument) {
+            let caps = REL_WINPATH_RE.captures(argument).unwrap();
+            let path_cap = caps.name("path").unwrap();
+            let path = std::str::from_utf8(&path_cap.as_bytes()).unwrap();
+
+            // Make sure that it really is a relative path and not for example a regex...
+            if Path::new(path).exists() {
+                let wsl_path = path.replace("\\", "/");
+
+                let before = match caps.name("before") {
+                    Some(s) => std::str::from_utf8(&s.as_bytes()).unwrap(),
+                    None => "",
                 };
-                acc
-            });
-            return format!("{}{}", &argname, &wsl_path);
+                let after = match caps.name("after") {
+                    Some(s) => std::str::from_utf8(&s.as_bytes()).unwrap(),
+                    None => "",
+                };
+
+                return format!("{}{}{}", before, wsl_path, after);
+            }
         }
     }
-    argument
+
+    std::str::from_utf8(&argument).unwrap().to_string()
 }
 
 // Translate absolute unix paths to windows paths by mapping what looks like a mounted drive ('/mnt/x') to a drive letter ('x:/').
@@ -361,34 +361,49 @@ mod tests {
 
     #[test]
     fn win_to_unix_path_trans() {
-        env::remove_var("WSLGIT_MOUNT_ROOT");
         assert_eq!(
-            translate_path_to_unix("d:\\test\\file.txt".to_string()),
-            "/mnt/d/test/file.txt"
+            translate_path_to_unix("D:\\test\\file.txt".to_string()),
+            "$(wslpath 'D:\\test\\file.txt')"
         );
         assert_eq!(
-            translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
-            "/mnt/c/Users/test/a space.txt"
-        );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
-        assert_eq!(
-            translate_path_to_unix("d:\\test\\file.txt".to_string()),
-            "/abc/d/test/file.txt"
+            translate_path_to_unix("D:/test/file.txt".to_string()),
+            "$(wslpath 'D:/test/file.txt')"
         );
         assert_eq!(
-            translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
-            "/abc/c/Users/test/a space.txt"
-        );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/");
-        assert_eq!(
-            translate_path_to_unix("d:\\test\\file.txt".to_string()),
-            "/d/test/file.txt"
+            translate_path_to_unix(" D:\\test\\file.txt".to_string()),
+            " $(wslpath 'D:\\test\\file.txt')"
         );
         assert_eq!(
-            translate_path_to_unix("C:\\Users\\test\\a space.txt".to_string()),
-            "/c/Users/test/a space.txt"
+            translate_path_to_unix(" D:/test/file.txt".to_string()),
+            " $(wslpath 'D:/test/file.txt')"
+        );
+        assert_eq!(
+            translate_path_to_unix(":main:D:\\test\\file.txt".to_string()),
+            ":main:$(wslpath 'D:\\test\\file.txt')"
+        );
+        assert_eq!(
+            translate_path_to_unix(":main:D:/test/file.txt".to_string()),
+            ":main:$(wslpath 'D:/test/file.txt')"
+        );
+        assert_eq!(
+            translate_path_to_unix("1,1:D:\\test\\file.txt".to_string()),
+            "1,1:$(wslpath 'D:\\test\\file.txt')"
+        );
+        assert_eq!(
+            translate_path_to_unix("1,1:D:/test/file.txt".to_string()),
+            "1,1:$(wslpath 'D:/test/file.txt')"
+        );
+        assert_eq!(
+            translate_path_to_unix("C:\\Users\\test user\\my file.txt".to_string()),
+            "$(wslpath 'C:\\Users\\test user\\my file.txt')"
+        );
+        assert_eq!(
+            translate_path_to_unix("C:/Users/test user/my file.txt".to_string()),
+            "$(wslpath 'C:/Users/test user/my file.txt')"
+        );
+        assert_eq!(
+            translate_path_to_unix("\\\\path\\to\\file.txt".to_string()),
+            "$(wslpath '\\\\path\\to\\file.txt')"
         );
     }
 
@@ -478,58 +493,60 @@ mod tests {
 
     #[test]
     fn relative_path_translation() {
-        env::remove_var("WSLGIT_MOUNT_ROOT");
+        assert_eq!(
+            translate_path_to_unix("src\\main.rs".to_string()),
+            "src/main.rs"
+        );
+        assert_eq!(
+            translate_path_to_unix("src/main.rs".to_string()),
+            "src/main.rs"
+        );
         assert_eq!(
             translate_path_to_unix(".\\src\\main.rs".to_string()),
             "./src/main.rs"
         );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
         assert_eq!(
-            translate_path_to_unix(".\\src\\main.rs".to_string()),
+            translate_path_to_unix("./src/main.rs".to_string()),
             "./src/main.rs"
         );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/");
         assert_eq!(
-            translate_path_to_unix(".\\src\\main.rs".to_string()),
-            "./src/main.rs"
+            translate_path_to_unix("..\\wslgit\\src\\main.rs".to_string()),
+            "../wslgit/src/main.rs"
+        );
+        assert_eq!(
+            translate_path_to_unix("../wslgit/src/main.rs".to_string()),
+            "../wslgit/src/main.rs"
+        );
+
+        assert_eq!(
+            translate_path_to_unix("prefix:..\\wslgit\\src\\main.rs:postfix".to_string()),
+            "prefix:../wslgit/src/main.rs:postfix"
+        );
+
+        assert_eq!(
+            translate_path_to_unix("^remote\\..*".to_string()),
+            "^remote\\..*"
         );
     }
 
     #[test]
     fn arguments_path_translation() {
-        env::remove_var("WSLGIT_MOUNT_ROOT");
         assert_eq!(
             translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
-            "--file=/mnt/c/some/path.txt"
+            "--file=$(wslpath 'C:\\some\\path.txt')"
+        );
+        assert_eq!(
+            translate_path_to_unix("--file=C:/some/path.txt".to_owned()),
+            "--file=$(wslpath 'C:/some/path.txt')"
         );
 
         assert_eq!(
             translate_path_to_unix("-c core.editor=C:\\some\\editor.exe".to_owned()),
-            "-c core.editor=/mnt/c/some/editor.exe"
+            "-c core.editor=$(wslpath 'C:\\some\\editor.exe')"
         );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
         assert_eq!(
-            translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
-            "--file=/abc/c/some/path.txt"
-        );
-
-        assert_eq!(
-            translate_path_to_unix("-c core.editor=C:\\some\\editor.exe".to_owned()),
-            "-c core.editor=/abc/c/some/editor.exe"
-        );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/");
-        assert_eq!(
-            translate_path_to_unix("--file=C:\\some\\path.txt".to_owned()),
-            "--file=/c/some/path.txt"
-        );
-
-        assert_eq!(
-            translate_path_to_unix("-c core.editor=C:\\some\\editor.exe".to_owned()),
-            "-c core.editor=/c/some/editor.exe"
+            translate_path_to_unix("-c core.editor=C:/some/editor.exe".to_owned()),
+            "-c core.editor=$(wslpath 'C:/some/editor.exe')"
         );
     }
 }
