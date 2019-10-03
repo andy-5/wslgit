@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::env;
 
 use std::io::{self, Write};
@@ -9,19 +8,6 @@ use std::process::{Command, Stdio};
 extern crate lazy_static;
 extern crate regex;
 use regex::bytes::Regex;
-
-fn mount_root() -> String {
-    match env::var("WSLGIT_MOUNT_ROOT") {
-        Ok(val) => {
-            if val.ends_with("/") {
-                return val;
-            } else {
-                return format!("{}/", val);
-            }
-        }
-        Err(_e) => return "/mnt/".to_string(),
-    }
-}
 
 fn translate_path_to_unix(argument: String) -> String {
     // An absolute or UNC path must:
@@ -78,20 +64,40 @@ fn translate_path_to_unix(argument: String) -> String {
     std::str::from_utf8(&argument).unwrap().to_string()
 }
 
-// Translate absolute unix paths to windows paths by mapping what looks like a mounted drive ('/mnt/x') to a drive letter ('x:/').
-// The path must either be the start of a line or start with a whitespace, and
-// the path must be the end of a line, end with a / or end with a whitespace.
-fn translate_path_to_win(line: &[u8]) -> Cow<[u8]> {
-    let wslpath_re: Regex = Regex::new(
-        format!(
-            r"(?m-u)(^|(?P<pre>[[:space:]])){}(?P<drive>[A-Za-z])($|/|(?P<post>[[:space:]]))",
-            mount_root()
-        )
-        .as_str(),
-    )
-    .expect("Failed to compile WSLPATH regex");
+fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
+    // Windows can handle both / and \ as path separator so there is no need to convert relative paths.
 
-    wslpath_re.replace_all(line, &b"${pre}${drive}:/${post}"[..])
+    // An absolute Unix path must:
+    // 1. Be at the beginning of the string or after a whitespace.
+    // 2. Begin with /
+    // 3. Not contain the characters: <>:|?'* or newline.
+    // Note that when an absolute path is found then the rest of the line is passed to wslpath as argument!
+    lazy_static! {
+        static ref WSLPATH_RE: Regex =
+            Regex::new(r"(?m)(?P<pre>^|[[:space:]])(?P<path>/([^<>:|?'*\n]*/?)*)")
+                .expect("Failed to compile WSLPATH_RE regex");
+    }
+
+    if WSLPATH_RE.is_match(line) {
+        // First use wslpath to convert the path to a windows path and then escape all \ (change to \\) using sed.
+        // This will make UNC paths, which begin with \\, return correctly.
+        let line = WSLPATH_RE
+            .replace_all(
+                line,
+                &b"${pre}$(wslpath -w '${path}' | sed 's/\\\\/\\\\\\\\/g')"[..],
+            )
+            .into_owned();
+        let line = std::str::from_utf8(&line).unwrap();
+
+        let echo_cmd = format!("echo -n \"{}\"", line);
+        let output = Command::new("bash")
+            .arg("-c")
+            .arg(echo_cmd)
+            .output()
+            .expect("failed to execute echo_cmd");
+        return output.stdout;
+    }
+    line.to_vec()
 }
 
 fn escape_newline(arg: String) -> String {
@@ -230,21 +236,6 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn mount_root_test() {
-        env::remove_var("WSLGIT_MOUNT_ROOT");
-        assert_eq!(mount_root(), "/mnt/");
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
-        assert_eq!(mount_root(), "/abc/");
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/abc");
-        assert_eq!(mount_root(), "/abc/");
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/");
-        assert_eq!(mount_root(), "/");
-    }
 
     #[test]
     fn use_interactive_shell_test() {
@@ -409,85 +400,18 @@ mod tests {
 
     #[test]
     fn unix_to_win_path_trans() {
-        env::remove_var("WSLGIT_MOUNT_ROOT");
         assert_eq!(
-            &*translate_path_to_win(b"/mnt/d/some path/a file.md"),
-            b"d:/some path/a file.md"
+            std::str::from_utf8(&translate_path_to_win(b"/fakemnt/d/some path/a file.md")).unwrap(),
+            "\\\\wsl$\\Ubuntu-18.04\\fakemnt\\d\\some path\\a file.md"
         );
         assert_eq!(
-            &*translate_path_to_win(b"origin  /mnt/c/path/ (fetch)"),
-            b"origin  c:/path/ (fetch)"
-        );
-        let multiline = b"mirror  /mnt/c/other/ (fetch)\nmirror  /mnt/c/other/ (push)\n";
-        let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
-        assert_eq!(
-            &*translate_path_to_win(&multiline[..]),
-            &multiline_result[..]
+            std::str::from_utf8(&translate_path_to_win(b"origin  /fakemnt/c/path/ (fetch)"))
+                .unwrap(),
+            "origin  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\path\\ (fetch)"
         );
         assert_eq!(
-            &*translate_path_to_win(b"/mnt/c  /mnt/c/ /mnt/c/d /mnt/c/d/"),
-            b"c:/  c:/ c:/d c:/d/"
-        );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
-        assert_eq!(
-            &*translate_path_to_win(b"/abc/d/some path/a file.md"),
-            b"d:/some path/a file.md"
-        );
-        assert_eq!(
-            &*translate_path_to_win(b"origin  /abc/c/path/ (fetch)"),
-            b"origin  c:/path/ (fetch)"
-        );
-        let multiline = b"mirror  /abc/c/other/ (fetch)\nmirror  /abc/c/other/ (push)\n";
-        let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
-        assert_eq!(
-            &*translate_path_to_win(&multiline[..]),
-            &multiline_result[..]
-        );
-        assert_eq!(
-            &*translate_path_to_win(b"/abc/c  /abc/c/ /abc/c/d /abc/c/d/"),
-            b"c:/  c:/ c:/d c:/d/"
-        );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/");
-        assert_eq!(
-            &*translate_path_to_win(b"/d/some path/a file.md"),
-            b"d:/some path/a file.md"
-        );
-        assert_eq!(
-            &*translate_path_to_win(b"origin  /c/path/ (fetch)"),
-            b"origin  c:/path/ (fetch)"
-        );
-        let multiline = b"mirror  /c/other/ (fetch)\nmirror  /c/other/ (push)\n";
-        let multiline_result = b"mirror  c:/other/ (fetch)\nmirror  c:/other/ (push)\n";
-        assert_eq!(
-            &*translate_path_to_win(&multiline[..]),
-            &multiline_result[..]
-        );
-        assert_eq!(
-            &*translate_path_to_win(b"/c  /c/ /c/d /c/d/"),
-            b"c:/  c:/ c:/d c:/d/"
-        );
-    }
-
-    #[test]
-    fn no_path_translation() {
-        env::remove_var("WSLGIT_MOUNT_ROOT");
-        assert_eq!(
-            &*translate_path_to_win(b"/mnt/other/file.sh /mnt/ab"),
-            b"/mnt/other/file.sh /mnt/ab"
-        );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/abc/");
-        assert_eq!(
-            &*translate_path_to_win(b"/abc/other/file.sh /abc/ab"),
-            b"/abc/other/file.sh /abc/ab"
-        );
-
-        env::set_var("WSLGIT_MOUNT_ROOT", "/");
-        assert_eq!(
-            &*translate_path_to_win(b"/other/file.sh /ab"),
-            b"/other/file.sh /ab"
+            std::str::from_utf8(&translate_path_to_win(b"mirror  /fakemnt/c/other/ (fetch)\nmirror  /fakemnt/c/other/ (push)\n")).unwrap(),
+            "mirror  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\other\\ (fetch)\nmirror  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\other\\ (push)\n"
         );
     }
 
