@@ -1,5 +1,6 @@
 use std::env;
 
+use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -92,9 +93,17 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
         let echo_cmd = format!("echo -n \"{}\"", line);
         let output = Command::new("bash")
             .arg("-c")
-            .arg(echo_cmd)
+            .arg(&echo_cmd)
             .output()
             .expect("failed to execute echo_cmd");
+        if enable_logging() {
+            log(format!(
+                "{:?} -> {} -> {:?}\n",
+                line,
+                echo_cmd,
+                std::str::from_utf8(&output.stdout).unwrap()
+            ));
+        }
         return output.stdout;
     }
     line.to_vec()
@@ -155,6 +164,42 @@ fn use_interactive_shell() -> bool {
     true
 }
 
+fn enable_logging() -> bool {
+    if let Ok(enable_log_flag) = env::var("WSLGIT_ENABLE_LOGGING") {
+        if enable_log_flag == "true" || enable_log_flag == "1" {
+            return true;
+        }
+    }
+    false
+}
+
+fn log_arguments(out_args: &Vec<String>) {
+    let in_args = env::args().collect::<Vec<String>>();
+    log(format!("{:?} -> {:?}\n", in_args, out_args));
+}
+
+fn log(message: String) {
+    let logfile = match env::current_exe() {
+        Ok(exe_path) => exe_path
+            .parent()
+            .unwrap()
+            .join("wslgit.log")
+            .to_string_lossy()
+            .into_owned(),
+        Err(e) => {
+            eprintln!("Failed to get current exe path: {}", e);
+            Path::new("wslgit.log").to_string_lossy().into_owned()
+        }
+    };
+
+    let f = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(logfile)
+        .unwrap();
+    write!(&f, "{}\n", message).unwrap();
+}
+
 fn main() {
     let mut cmd_args = Vec::new();
     let mut git_args: Vec<String> = vec![String::from("git")];
@@ -177,6 +222,10 @@ fn main() {
         cmd_args.push("-c".to_string());
     }
     cmd_args.push(git_cmd.clone());
+
+    if enable_logging() {
+        log_arguments(&cmd_args);
+    }
 
     // setup the git subprocess launched inside WSL
     let mut git_proc_setup = Command::new("wsl");
