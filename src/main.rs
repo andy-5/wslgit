@@ -138,11 +138,23 @@ fn format_argument(arg: String) -> String {
     }
 }
 
+/// Return `true` if the git command can access remotes and therefore might need
+/// the setup of an interactive shell.
+fn git_command_needs_interactive_shell() -> bool {
+    const CMDS: &[&str] = &["clone", "fetch", "pull", "push"];
+    env::args()
+        .skip(1)
+        .position(|arg| CMDS.iter().position(|&tcmd| tcmd == arg).is_some())
+        .is_some()
+}
+
 fn use_interactive_shell() -> bool {
     // check for explicit environment variable setting
     if let Ok(interactive_flag) = env::var("WSLGIT_USE_INTERACTIVE_SHELL") {
         if interactive_flag == "false" || interactive_flag == "0" {
             return false;
+        } else if interactive_flag == "smart" {
+            return git_command_needs_interactive_shell();
         } else {
             return true;
         }
@@ -161,7 +173,8 @@ fn use_interactive_shell() -> bool {
             }
         }
     }
-    true
+    // default
+    git_command_needs_interactive_shell()
 }
 
 fn enable_logging() -> bool {
@@ -285,7 +298,13 @@ mod tests {
         env::remove_var("WSLGIT_USE_INTERACTIVE_SHELL");
         env::remove_var("BASH_ENV");
         env::remove_var("WSLENV");
-        assert_eq!(use_interactive_shell(), true);
+
+        // It is not possible to change env::args, so the arguments that are matched
+        // in git_command_needs_interactive_shell() are the arguments to cargo,
+        // which does not match any of the git commands that needs interactive shell.
+        let default_value = false;
+
+        assert_eq!(use_interactive_shell(), default_value);
 
         // disable using WSLGIT_USE_INTERACTIVE_SHELL set to 'false' or '0'
         env::set_var("WSLGIT_USE_INTERACTIVE_SHELL", "false");
@@ -303,7 +322,7 @@ mod tests {
 
         // just having BASH_ENV is not enough
         env::set_var("BASH_ENV", "something");
-        assert_eq!(use_interactive_shell(), true);
+        assert_eq!(use_interactive_shell(), default_value);
 
         // BASH_ENV must also be in WSLENV
         env::set_var("WSLENV", "BASH_ENV");
@@ -323,12 +342,13 @@ mod tests {
         env::set_var("WSLENV", "TMP:BASH_ENV/up:TMP");
         assert_eq!(use_interactive_shell(), false);
 
-        env::set_var("WSLENV", "NOT_BASH_ENV/up");
-        assert_eq!(use_interactive_shell(), true);
-
         // WSLGIT_USE_INTERACTIVE_SHELL overrides BASH_ENV
         env::set_var("WSLGIT_USE_INTERACTIVE_SHELL", "true");
         assert_eq!(use_interactive_shell(), true);
+        env::remove_var("WSLGIT_USE_INTERACTIVE_SHELL");
+
+        env::set_var("WSLENV", "NOT_BASH_ENV/up");
+        assert_eq!(use_interactive_shell(), default_value);
     }
 
     #[test]
