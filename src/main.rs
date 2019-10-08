@@ -243,6 +243,19 @@ fn main() {
     // setup the git subprocess launched inside WSL
     let mut git_proc_setup = Command::new("wsl");
     git_proc_setup.args(&cmd_args);
+
+    git_proc_setup.env("WSLGIT", "1");
+    let wslenv = match env::var("WSLENV") {
+        Ok(wslenv) => {
+            if wslenv.is_empty() {
+                format!("WSLGIT")
+            } else {
+                format!("{}:WSLGIT", wslenv)
+            }
+        },
+        Err(_e) => format!("WSLGIT"),
+    };
+    env::set_var("WSLENV", wslenv);
     let status;
 
     // add git commands that must use translate_path_to_win

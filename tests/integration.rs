@@ -263,4 +263,29 @@ mod integration {
             .success()
             .stdout(cwd);
     }
+
+    #[test]
+    fn wslgit_environment_variable() {
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            // Use pretty format to call 'env'
+            .args(&["log", "-1", "--pretty=format:\"$(env)\""])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .env("WSLENV", "")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("WSLGIT=1"))
+            .stdout(predicate::str::contains("WSLENV=WSLGIT"));
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            // Use pretty format to call 'env'
+            .args(&["log", "-1", "--pretty=format:\"$(env)\""])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .env("WSLENV", "hello")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("WSLGIT=1"))
+            .stdout(predicate::str::contains("WSLENV=hello:WSLGIT"));
+    }
 }

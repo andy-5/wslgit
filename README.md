@@ -93,6 +93,14 @@ therefore also starts bash in non-interactive mode.
 
 This feature is only available in Windows 10 builds 17063 and later.
 
+### WSLGIT
+`wslgit` set a variable called `WSLGIT` to `1` and shares it to WSL. This variable can be used in `.bashrc` to 
+determine if WSL was invoked by `wslgit`, and for example if set then just do the absolute minimum of initialization 
+needed for `git` to function.  
+Combined with `WSLGIT_USE_INTERACTIVE_SHELL=smart` (default) this can make every git command execute with as little overhead as possible.
+
+This feature is only available in Windows 10 builds 17063 and later.
+
 ## Building from source
 
 First, install Rust from https://www.rust-lang.org. Rust on Windows also
