@@ -233,7 +233,7 @@ fn main() {
     let status;
 
     // add git commands that must use translate_path_to_win
-    const TRANSLATED_CMDS: &[&str] = &["rev-parse", "remote"];
+    const TRANSLATED_CMDS: &[&str] = &["rev-parse", "remote", "init"];
 
     let translate_output = env::args()
         .skip(1)
