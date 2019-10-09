@@ -98,7 +98,7 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
             .expect("failed to execute echo_cmd");
         if enable_logging() {
             log(format!(
-                "{:?} -> {} -> {:?}\n",
+                "{:?} -> {} -> {:?}",
                 line,
                 echo_cmd,
                 std::str::from_utf8(&output.stdout).unwrap()
@@ -175,7 +175,7 @@ fn enable_logging() -> bool {
 
 fn log_arguments(out_args: &Vec<String>) {
     let in_args = env::args().collect::<Vec<String>>();
-    log(format!("{:?} -> {:?}\n", in_args, out_args));
+    log(format!("{:?} -> {:?}", in_args, out_args));
 }
 
 fn log(message: String) {
