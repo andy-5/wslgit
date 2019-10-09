@@ -85,7 +85,7 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
         let line = WSLPATH_RE
             .replace_all(
                 line,
-                &b"${pre}$(wslpath -w '${path}' | sed 's/\\\\/\\\\\\\\/g')"[..],
+                &b"${pre}$(WINPATH=$(wslpath -w '${path}'); echo -n ${WINPATH//\\\\/\\\\\\\\})"[..],
             )
             .into_owned();
         let line = std::str::from_utf8(&line).unwrap();
@@ -452,8 +452,8 @@ mod tests {
             "origin  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\path\\ (fetch)"
         );
         assert_eq!(
-            std::str::from_utf8(&translate_path_to_win(b"mirror  /fakemnt/c/other/ (fetch)\nmirror  /fakemnt/c/other/ (push)\n")).unwrap(),
-            "mirror  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\other\\ (fetch)\nmirror  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\other\\ (push)\n"
+            std::str::from_utf8(&translate_path_to_win(b"mirror  /fakemnt/c/one/ (fetch)\nmirror  /fakemnt/c/two/ (push)\n")).unwrap(),
+            "mirror  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\one\\ (fetch)\nmirror  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\two\\ (push)\n"
         );
     }
 
