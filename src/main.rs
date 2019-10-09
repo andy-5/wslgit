@@ -17,7 +17,7 @@ fn translate_path_to_unix(argument: String) -> String {
     // 3. Not contain the characters: <>:|?' or newline.
     lazy_static! {
         static ref ABS_WINPATH_RE: Regex = Regex::new(
-            r"(?-u)(?P<pre>^|[[:space:]]|:|=)(?P<path>([A-Z]:[\\/]|\\\\)([^<>:|?'\n]*[\\/]?)*)"
+            r"(?-u)(?P<pre>^|[[:space:]]|:|=)(?P<path>([A-Za-z]:[\\/]|\\\\)([^<>:|?'\n]*[\\/]?)*)"
         )
         .expect("Failed to compile ABS_WINPATH_RE regex.");
     }
