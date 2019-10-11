@@ -1,7 +1,18 @@
 # WSLGit Changelog
 
 
-## [0.8.0] - unreleased
+## [0.9.0] - unreleased
+
+### Changed
+
+- Use `wslpath` to translate paths between Windows and Linux.
+
+### Removed
+
+- Remove `WSLGIT_MOUNT_ROOT` environment variable, this is handled by `wslpath` now.
+
+
+## [0.8.0] - 2019-10-11
 
 ### Added
 
@@ -117,3 +128,4 @@
 [0.5.0]: https://github.com/andy-5/wslgit/releases/tag/v0.5.0
 [0.6.0]: https://github.com/andy-5/wslgit/releases/tag/v0.6.0
 [0.7.0]: https://github.com/andy-5/wslgit/releases/tag/v0.7.0
+[0.8.0]: https://github.com/andy-5/wslgit/releases/tag/v0.8.0
