@@ -252,7 +252,7 @@ fn main() {
             } else {
                 format!("{}:WSLGIT", wslenv)
             }
-        },
+        }
         Err(_e) => format!("WSLGIT"),
     };
     env::set_var("WSLENV", wslenv);
@@ -475,6 +475,15 @@ mod tests {
 
     #[test]
     fn unix_to_win_path_trans() {
+        if Command::new("bash")
+            .arg("-c")
+            .arg("wslpath")
+            .output()
+            .is_err()
+        {
+            // Skip test if `wslpath` is not available (e.g. in CI)
+            return;
+        }
         assert_eq!(
             std::str::from_utf8(&translate_path_to_win(b"/fakemnt/d/some path/a file.md")).unwrap(),
             "\\\\wsl$\\Ubuntu-18.04\\fakemnt\\d\\some path\\a file.md"
