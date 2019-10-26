@@ -3,9 +3,16 @@
 
 ## [0.9.0] - unreleased
 
+### Added
+
+- New `WSLGIT` environment variable that is set to `1` by `wslgit` and
+  shared to the WSL environment.
+
 ### Changed
 
-- Use `wslpath` to translate paths between Windows and Linux.
+- Use `wslpath` to translate paths between Windows and Linux (#12, #71).
+- New default `smart` for `WSLGIT_USE_INTERACTIVE_SHELL` - only uses an
+  interactive bash shell for `clone`, `fetch`, `pull` and `push`.
 
 ### Removed
 
