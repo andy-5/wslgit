@@ -475,13 +475,14 @@ mod tests {
 
     #[test]
     fn unix_to_win_path_trans() {
-        if Command::new("bash")
+        let check_wslpath = Command::new("bash")
             .arg("-c")
-            .arg("wslpath")
-            .output()
-            .is_err()
-        {
+            .arg("wslpath C:\\")
+            .output();
+        if check_wslpath.is_err() || !check_wslpath.expect("bash output").status.success() {
             // Skip test if `wslpath` is not available (e.g. in CI)
+            // Either bash was not found, or running `wslpath` returned an error code
+            print!("SKIPPING TEST ... ");
             return;
         }
         assert_eq!(
