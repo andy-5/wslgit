@@ -91,7 +91,8 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
         let line = std::str::from_utf8(&line).unwrap();
 
         let echo_cmd = format!("echo -n \"{}\"", line);
-        let output = Command::new("bash")
+        let output = Command::new("wsl")
+            .arg("bash")
             .arg("-c")
             .arg(&echo_cmd)
             .output()
@@ -475,7 +476,8 @@ mod tests {
 
     #[test]
     fn unix_to_win_path_trans() {
-        let check_wslpath = Command::new("bash")
+        let check_wslpath = Command::new("wsl")
+            .arg("bash")
             .arg("-c")
             .arg("wslpath C:\\")
             .output();
