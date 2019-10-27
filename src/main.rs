@@ -14,10 +14,10 @@ fn translate_path_to_unix(argument: String) -> String {
     // An absolute or UNC path must:
     // 1. Be at the beginning of the string, or after a whitespace, colon, or equal-sign.
     // 2. Begin with <drive-letter>:\, <drive-letter>:/ or \\
-    // 3. Not contain the characters: <>:|?' or newline.
+    // 3. Not contain the characters: <>:|?'" or newline.
     lazy_static! {
         static ref ABS_WINPATH_RE: Regex = Regex::new(
-            r"(?-u)(?P<pre>^|[[:space:]]|:|=)(?P<path>([A-Za-z]:[\\/]|\\\\)([^<>:|?'\n]*[\\/]?)*)"
+            r#"(?-u)(?P<pre>^|[[:space:]]|:|=)(?P<path>([A-Za-z]:[\\/]|\\\\)([^<>:|?'"\n]*[\\/]?)*)"#
         )
         .expect("Failed to compile ABS_WINPATH_RE regex.");
     }
@@ -33,7 +33,7 @@ fn translate_path_to_unix(argument: String) -> String {
     // 4. And then any number of valid characters (including \).
     lazy_static! {
         static ref REL_WINPATH_RE: Regex = Regex::new(
-            r"(?-u)^(?P<before>[^\\]+([[:space:]]|:|=))?(?P<path>([^<>:|?'\n\\]+)\\([^<>:|?'\n]*))(?P<after>.*)"
+            r#"(?-u)^(?P<before>[^\\]+([[:space:]]|:|=))?(?P<path>([^<>:|?'"\n\\]+)\\([^<>:|?'"\n]*))(?P<after>.*)"#
         )
         .expect("Failed to compile REL_WINPATH_RE regex.");
     }
@@ -538,6 +538,11 @@ mod tests {
             translate_path_to_unix("^remote\\..*".to_string()),
             "^remote\\..*"
         );
+
+        assert_eq!(
+            translate_path_to_unix("\"prefix:..\\wslgit\\src\\main.rs\"".to_string()),
+            "\"prefix:../wslgit/src/main.rs\""
+        );
     }
 
     #[test]
@@ -558,6 +563,13 @@ mod tests {
         assert_eq!(
             translate_path_to_unix("-c core.editor=C:/some/editor.exe".to_owned()),
             "-c core.editor=$(wslpath 'C:/some/editor.exe')"
+        );
+
+        assert_eq!(
+            translate_path_to_unix(
+                "-c \"credential.helper=C:/Program Files/SmartGit/lib/credentials.cmd\"".to_owned()
+            ),
+            "-c \"credential.helper=$(wslpath 'C:/Program Files/SmartGit/lib/credentials.cmd')\""
         );
     }
 }
