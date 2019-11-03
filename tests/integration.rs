@@ -33,36 +33,25 @@ mod integration {
     }
 
     #[test]
-    fn quoted_argument_with_invalid_character() {
+    fn quote_characters_in_argument() {
         Command::cargo_bin(env!("CARGO_PKG_NAME"))
             .unwrap()
-            .args(&["log", "-n1", "--pretty=\"format:(X|Y)\""])
+            .args(&["log", "-n1", "--pretty=format:\"(X|Y)\""])
             .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
             .assert()
             .success()
-            .stdout("(X|Y)");
+            .stdout("\"(X|Y)\"");
     }
 
     #[test]
-    fn strangely_quoted_argument() {
+    fn quote_characters_and_spaces() {
         Command::cargo_bin(env!("CARGO_PKG_NAME"))
             .unwrap()
-            .args(&["log", "-n1", "--pr\"etty=format:(X|Y)\""])
+            .args(&["log", "-n1", "--pretty=format:\"( X | Y )\""])
             .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
             .assert()
             .success()
-            .stdout("(X|Y)");
-    }
-
-    #[test]
-    fn quoted_argument_with_invalid_character_and_spaces() {
-        Command::cargo_bin(env!("CARGO_PKG_NAME"))
-            .unwrap()
-            .args(&["log", "-n1", "--pretty=\"format:( X | Y )\""])
-            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
-            .assert()
-            .success()
-            .stdout("( X | Y )");
+            .stdout("\"( X | Y )\"");
     }
 
     #[test]
@@ -269,7 +258,7 @@ mod integration {
         Command::cargo_bin(env!("CARGO_PKG_NAME"))
             .unwrap()
             // Use pretty format to call 'env'
-            .args(&["log", "-1", "--pretty=format:\"$(env)\""])
+            .args(&["log", "-1", "--pretty=format:$(env)"])
             .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
             .env("WSLENV", "")
             .assert()
@@ -280,7 +269,7 @@ mod integration {
         Command::cargo_bin(env!("CARGO_PKG_NAME"))
             .unwrap()
             // Use pretty format to call 'env'
-            .args(&["log", "-1", "--pretty=format:\"$(env)\""])
+            .args(&["log", "-1", "--pretty=format:$(env)"])
             .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
             .env("WSLENV", "hello")
             .assert()
