@@ -1,7 +1,7 @@
 # WSLGit Changelog
 
 
-## [0.9.0] - unreleased
+## [0.9.0] - 2020-01-10
 
 ### Added
 
