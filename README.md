@@ -9,23 +9,33 @@ For these two to interoperate, this tool translates paths
 between the Windows (`C:\Foo\Bar`) and Linux (`/mnt/c/Foo/Bar`)
 representations.
 
-## Download
+## Installation
 
-The latest binary release can be found on the
+The latest binary release can be downloaded from the
 [releases page](https://github.com/andy-5/wslgit/releases).
+
+After unzipping the release run the `install.bat` script *as administrator* to 
+create the required symbolic links in the `wslgit\bin` folder.  
+
+Put the directory containing the executable (`wslgit\bin`) somewhere on your Windows `Path`
+environment variable (user or system).  
+To change the environment variable, type
+`Edit environment variables for your account` into Start menu/Windows search
+and use that tool to edit `Path`.
 
 You may also need to install the latest
 [*Microsoft Visual C++ Redistributable for Visual Studio 2017*](https://aka.ms/vs/15/release/vc_redist.x64.exe).
 
-
 ## Usage in VSCode
 
-To use this inside VSCode, put the `wslgit.exe` executable somewhere on
-your computer and set the appropriate path in your VSCode `settings.json`:
+VSCode will find the `git` executable in `wslgit\bin` automatically if the path  
+was added to the Windows `Path` environment variable.
+
+If not, set the appropriate path in your VSCode `settings.json`:
 
 ```
 {
-    "git.path": "C:\\CHANGE\\TO\\PATH\\TO\\wslgit.exe"
+    "git.path": "C:\\CHANGE\\TO\\PATH\\TO\\wslgit\\bin\\git.exe"
 }
 ```
 
@@ -42,13 +52,8 @@ Git plugin cannot correctly parse the output.
 
 ## Usage from the command line
 
-Put the directory containing the executable somewhere on your Windows `Path`
-environment variable and optionally rename `wslgit.exe` to `git.exe`.
-To change the environment variable, type
-`Edit environment variables for your account` into Start menu/Windows search
-and use that tool to edit `Path`.
-
-You can then just run any git command from a Windows console
+If you put the path to `wslgit\bin` on the Windows `Path` environment variable 
+you can then just run any git command from a Windows console
 by running `wslgit COMMAND` or `git COMMAND` and it uses the Git version
 installed in WSL.
 
