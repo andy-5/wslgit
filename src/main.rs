@@ -13,6 +13,8 @@ use regex::bytes::Regex;
 mod fork;
 mod wsl;
 
+static mut DOUBLE_DASH_FOUND: bool = false;
+
 fn translate_path_to_unix(argument: String) -> String {
     // An absolute or UNC path must:
     // 1. Be at the beginning of the string, or after a whitespace, colon, or equal-sign.
@@ -42,27 +44,30 @@ fn translate_path_to_unix(argument: String) -> String {
         .expect("Failed to compile REL_WINPATH_RE regex.");
     }
 
-    {
-        if REL_WINPATH_RE.is_match(argument) {
-            let caps = REL_WINPATH_RE.captures(argument).unwrap();
-            let path_cap = caps.name("path").unwrap();
-            let path = std::str::from_utf8(&path_cap.as_bytes()).unwrap();
+    if REL_WINPATH_RE.is_match(argument) {
+        let caps = REL_WINPATH_RE.captures(argument).unwrap();
+        let path_cap = caps.name("path").unwrap();
+        let path = std::str::from_utf8(&path_cap.as_bytes()).unwrap();
 
-            // Make sure that it really is a relative path and not for example a regex...
-            if Path::new(path).exists() {
-                let wsl_path = path.replace("\\", "/");
+        let double_dash_found = unsafe { DOUBLE_DASH_FOUND };
 
-                let before = match caps.name("before") {
-                    Some(s) => std::str::from_utf8(&s.as_bytes()).unwrap(),
-                    None => "",
-                };
-                let after = match caps.name("after") {
-                    Some(s) => std::str::from_utf8(&s.as_bytes()).unwrap(),
-                    None => "",
-                };
+        // If the path in the argument exists then it is definitely a relative path,
+        // or if the argument is after double-dashes then it is very likely a relative path.
+        let translate_relative_path = double_dash_found == true || Path::new(path).exists();
 
-                return format!("{}{}{}", before, wsl_path, after);
-            }
+        if translate_relative_path {
+            let wsl_path = path.replace("\\", "/");
+
+            let before = match caps.name("before") {
+                Some(s) => std::str::from_utf8(&s.as_bytes()).unwrap(),
+                None => "",
+            };
+            let after = match caps.name("after") {
+                Some(s) => std::str::from_utf8(&s.as_bytes()).unwrap(),
+                None => "",
+            };
+
+            return format!("{}{}{}", before, wsl_path, after);
         }
     }
 
@@ -134,14 +139,21 @@ fn quote_argument(arg: String) -> String {
 }
 
 fn format_argument(arg: String) -> String {
-    let mut arg = arg;
-    if fork::needs_patching() {
-        arg = fork::patch_argument(arg);
+    if arg == "--" {
+        unsafe {
+            DOUBLE_DASH_FOUND = true;
+        };
+        return arg;
+    } else {
+        let mut arg = arg;
+        if fork::needs_patching() {
+            arg = fork::patch_argument(arg);
+        }
+        arg = translate_path_to_unix(arg);
+        arg = escape_characters(arg);
+        arg = quote_argument(arg);
+        arg
     }
-    arg = translate_path_to_unix(arg);
-    arg = escape_characters(arg);
-    arg = quote_argument(arg);
-    arg
 }
 
 /// Return `true` if the git command can access remotes and therefore might need
@@ -396,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn format_long_argument_with_invalid_character() {
+    fn quote_long_argument_with_invalid_character() {
         assert_eq!(quote_argument("--abc def".to_string()), "\"--abc def\"");
         assert_eq!(quote_argument("--abc=def".to_string()), "--abc=def");
         assert_eq!(quote_argument("--abc=d ef".to_string()), "\"--abc=d ef\"");
@@ -418,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn format_empty_argument() {
+    fn quote_empty_argument() {
         assert_eq!(quote_argument("".to_string()), "\"\"");
     }
 
@@ -509,6 +521,10 @@ mod tests {
 
     #[test]
     fn relative_path_translation() {
+        unsafe {
+            DOUBLE_DASH_FOUND = false;
+        }
+
         assert_eq!(
             translate_path_to_unix("src\\main.rs".to_string()),
             "src/main.rs"
@@ -547,6 +563,37 @@ mod tests {
         assert_eq!(
             translate_path_to_unix("\"prefix:..\\wslgit\\src\\main.rs\"".to_string()),
             "\"prefix:../wslgit/src/main.rs\""
+        );
+    }
+
+    #[test]
+    fn relative_path_after_double_dash() {
+        unsafe {
+            DOUBLE_DASH_FOUND = false;
+        }
+        assert_eq!(format_argument("--".to_string()), "--");
+        assert_eq!(unsafe { DOUBLE_DASH_FOUND }, true);
+
+        unsafe {
+            DOUBLE_DASH_FOUND = false;
+        }
+        assert_eq!(format_argument("-".to_string()), "-");
+        assert_eq!(unsafe { DOUBLE_DASH_FOUND }, false);
+
+        unsafe {
+            DOUBLE_DASH_FOUND = false;
+        }
+        assert_eq!(
+            format_argument("path\\to\\nonexisting\\file.txt".to_string()),
+            "path\\to\\nonexisting\\file.txt"
+        );
+
+        unsafe {
+            DOUBLE_DASH_FOUND = true;
+        }
+        assert_eq!(
+            format_argument("path\\to\\nonexisting\\file.txt".to_string()),
+            "path/to/nonexisting/file.txt"
         );
     }
 
