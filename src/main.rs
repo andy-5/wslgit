@@ -130,6 +130,14 @@ fn quote_argument(arg: String) -> String {
     }
 }
 
+fn format_argument(arg: String) -> String {
+    let mut arg = arg;
+    arg = translate_path_to_unix(arg);
+    arg = escape_characters(arg);
+    arg = quote_argument(arg);
+    arg
+}
+
 /// Return `true` if the git command can access remotes and therefore might need
 /// the setup of an interactive shell.
 fn git_command_needs_interactive_shell() -> bool {
@@ -209,13 +217,7 @@ fn main() {
     let mut cmd_args = Vec::new();
     let mut git_args: Vec<String> = vec![String::from("git")];
 
-    git_args.extend(
-        env::args()
-            .skip(1)
-            .map(translate_path_to_unix)
-            .map(escape_characters)
-            .map(quote_argument),
-    );
+    git_args.extend(env::args().skip(1).map(format_argument));
 
     let git_cmd: String = git_args.join(" ");
 
