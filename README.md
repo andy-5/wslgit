@@ -58,6 +58,10 @@ by running `wslgit COMMAND` or `git COMMAND` and it uses the Git version
 installed in WSL.
 
 
+## Usage in Fork
+[Fork](https://fork.dev) is a Git GUI tool for Windows (and Mac) that use its own portable version of `Git for Windows`.  
+To make Fork use `git from WSL` then go to the preferences and select a custom git instance where you point it to the `git.exe` in the `wslgit\bin` folder.
+
 ## Remarks
 
 Currently, the path translation and shell escaping is very limited,

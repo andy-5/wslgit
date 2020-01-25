@@ -10,6 +10,7 @@ extern crate lazy_static;
 extern crate regex;
 use regex::bytes::Regex;
 
+mod fork;
 mod wsl;
 
 fn translate_path_to_unix(argument: String) -> String {
@@ -134,6 +135,9 @@ fn quote_argument(arg: String) -> String {
 
 fn format_argument(arg: String) -> String {
     let mut arg = arg;
+    if fork::needs_patching() {
+        arg = fork::patch_argument(arg);
+    }
     arg = translate_path_to_unix(arg);
     arg = escape_characters(arg);
     arg = quote_argument(arg);
