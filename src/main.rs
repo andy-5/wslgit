@@ -122,7 +122,7 @@ fn invalid_characters(ch: char) -> bool {
     }
 }
 
-fn format_argument(arg: String) -> String {
+fn quote_argument(arg: String) -> String {
     if arg.contains(invalid_characters) || arg.is_empty() {
         return format!("\"{}\"", arg);
     } else {
@@ -214,7 +214,7 @@ fn main() {
             .skip(1)
             .map(translate_path_to_unix)
             .map(escape_characters)
-            .map(format_argument),
+            .map(quote_argument),
     );
 
     let git_cmd: String = git_args.join(" ");
@@ -382,46 +382,46 @@ mod tests {
     }
 
     #[test]
-    fn format_argument_with_invalid_character() {
-        assert_eq!(format_argument("abc def".to_string()), "\"abc def\"");
-        assert_eq!(format_argument("abc(def".to_string()), "\"abc(def\"");
-        assert_eq!(format_argument("abc)def".to_string()), "\"abc)def\"");
-        assert_eq!(format_argument("abc|def".to_string()), "\"abc|def\"");
+    fn quote_argument_with_invalid_character() {
+        assert_eq!(quote_argument("abc def".to_string()), "\"abc def\"");
+        assert_eq!(quote_argument("abc(def".to_string()), "\"abc(def\"");
+        assert_eq!(quote_argument("abc)def".to_string()), "\"abc)def\"");
+        assert_eq!(quote_argument("abc|def".to_string()), "\"abc|def\"");
         assert_eq!(
-            format_argument("\\\"abc def\\\"".to_string()),
+            quote_argument("\\\"abc def\\\"".to_string()),
             "\"\\\"abc def\\\"\""
         );
         assert_eq!(
-            format_argument("user.(name|email)".to_string()),
+            quote_argument("user.(name|email)".to_string()),
             "\"user.(name|email)\""
         );
     }
 
     #[test]
     fn format_long_argument_with_invalid_character() {
-        assert_eq!(format_argument("--abc def".to_string()), "\"--abc def\"");
-        assert_eq!(format_argument("--abc=def".to_string()), "--abc=def");
-        assert_eq!(format_argument("--abc=d ef".to_string()), "\"--abc=d ef\"");
-        assert_eq!(format_argument("--abc=d(ef".to_string()), "\"--abc=d(ef\"");
-        assert_eq!(format_argument("--abc=d)ef".to_string()), "\"--abc=d)ef\"");
-        assert_eq!(format_argument("--abc=d|ef".to_string()), "\"--abc=d|ef\"");
+        assert_eq!(quote_argument("--abc def".to_string()), "\"--abc def\"");
+        assert_eq!(quote_argument("--abc=def".to_string()), "--abc=def");
+        assert_eq!(quote_argument("--abc=d ef".to_string()), "\"--abc=d ef\"");
+        assert_eq!(quote_argument("--abc=d(ef".to_string()), "\"--abc=d(ef\"");
+        assert_eq!(quote_argument("--abc=d)ef".to_string()), "\"--abc=d)ef\"");
+        assert_eq!(quote_argument("--abc=d|ef".to_string()), "\"--abc=d|ef\"");
         assert_eq!(
-            format_argument("--pretty=format:a(b|c)d".to_string()),
+            quote_argument("--pretty=format:a(b|c)d".to_string()),
             "\"--pretty=format:a(b|c)d\""
         );
         assert_eq!(
-            format_argument("--pretty=format:a (b | c) d".to_string()),
+            quote_argument("--pretty=format:a (b | c) d".to_string()),
             "\"--pretty=format:a (b | c) d\""
         );
         // Long arguments with invalid characters in argument name
-        assert_eq!(format_argument("--abc(def".to_string()), "\"--abc(def\"");
-        assert_eq!(format_argument("--abc)def".to_string()), "\"--abc)def\"");
-        assert_eq!(format_argument("--abc|def".to_string()), "\"--abc|def\"");
+        assert_eq!(quote_argument("--abc(def".to_string()), "\"--abc(def\"");
+        assert_eq!(quote_argument("--abc)def".to_string()), "\"--abc)def\"");
+        assert_eq!(quote_argument("--abc|def".to_string()), "\"--abc|def\"");
     }
 
     #[test]
     fn format_empty_argument() {
-        assert_eq!(format_argument("".to_string()), "\"\"");
+        assert_eq!(quote_argument("".to_string()), "\"\"");
     }
 
     #[test]
