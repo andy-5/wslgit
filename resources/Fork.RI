@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Used as a proxy for calling Fork.RI.exe from WSL with the path to `git-rebase-todo`
+# converted to a windows path.
+# Expects the environment variable FORK_RI_EXE_PATH to contain the path to Fork.RI.exe.
+
+UNAME=$(uname -a)
+# 'uname -a' returns:
+# WSL1: Linux PCNAME 4.4.0-17134-Microsoft #706-Microsoft Mon Apr 01 18:13:00 PST 2019 x86_64 x86_64 x86_64 GNU/Linux
+# MINGW64: MINGW64_NT-10.0 PCNAME 2.11.2(0.329/5/3) 2018-11-26 09:22 x86_64 Msys
+# MINGW32: MINGW32_NT-10.0 PCNAME 2.11.2(0.329/5/3) 2018-11-26 09:22 x86_64 Msys
+# MSYS: MSYS_NT-10.0 PCNAME 2.11.2(0.329/5/3) 2018-11-26 09:22 x86_64 Msys
+
+if [[ $UNAME == *Microsoft* ]]; then
+    # in a wsl shell
+    WSL_BUILD=$(sed -E 's/^.+-([0-9]+)-[Mm]icrosoft.*/\1/' <<< $UNAME)
+    if [ $WSL_BUILD -ge 17046 ] 2> /dev/null; then
+        # WSLPATH is available since WSL build 17046
+
+        # Make sure that Fork.RI.exe is executable.
+        chmod +x "$FORK_RI_EXE_PATH"
+
+        # Call Fork.RI.exe with the path to the REBASE-TODO converted to a windows path.
+        ARGS=$(wslpath -w "$@")
+        "$FORK_RI_EXE_PATH" "$ARGS"
+        exit $?
+    else
+        # ! No WSLPATH available.
+        exit 1
+    fi
+else
+    # unknown shell
+    exit 1
+fi
