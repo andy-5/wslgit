@@ -13,11 +13,12 @@ use regex::bytes::Regex;
 fn translate_path_to_unix(argument: String) -> String {
     // An absolute or UNC path must:
     // 1. Be at the beginning of the string, or after a whitespace, colon, or equal-sign.
-    // 2. Begin with <drive-letter>:\, <drive-letter>:/ or \\
-    // 3. Not contain the characters: <>:|?'" or newline.
+    // 2. Begin with <drive-letter>:\, <drive-letter>:/, \\ or //.
+    // 3. Consist of 0 or more path components that does not contain the characters <>:|?'"\/ or newline,
+    //    and are delimited by \ or /.
     lazy_static! {
         static ref ABS_WINPATH_RE: Regex = Regex::new(
-            r#"(?-u)(?P<pre>^|[[:space:]]|:|=)(?P<path>([A-Za-z]:[\\/]|\\\\)([^<>:|?'"\n]*[\\/]?)*)"#
+            r#"(?-u)(?P<pre>^|[[:space:]]|:|=)(?P<path>([A-Za-z]:[\\/]|\\\\|//)([^<>:|?'"\\/\n]+[\\/]?)*)"#
         )
         .expect("Failed to compile ABS_WINPATH_RE regex.");
     }
@@ -468,6 +469,15 @@ mod tests {
         assert_eq!(
             translate_path_to_unix("\\\\path\\to\\file.txt".to_string()),
             "$(wslpath '\\\\path\\to\\file.txt')"
+        );
+        // $ git commit --file="//wsl$/Ubuntu-18.04/home/"
+        assert_eq!(
+            translate_path_to_unix("\\\\wsl$\\Ubuntu-18.04\\home".to_string()),
+            "$(wslpath '\\\\wsl$\\Ubuntu-18.04\\home')"
+        );
+        assert_eq!(
+            translate_path_to_unix("//wsl$/Ubuntu-18.04/home".to_string()),
+            "$(wslpath '//wsl$/Ubuntu-18.04/home')"
         );
     }
 
