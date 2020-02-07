@@ -37,7 +37,7 @@ if exist "%BINDIR%\sh.exe" (
     echo 'sh.exe' already exist.
 ) else (
     echo Create 'sh.exe' symlink...
-    mklink %BINDIR%\sh.exe C:\Windows\System32\bash.exe
+    mklink %BINDIR%\sh.exe C:\Windows\System32\wsl.exe
     if %ERRORLEVEL% neq 0 (
         echo ERROR! Failed to create symlink.
         goto :error
@@ -49,7 +49,7 @@ if exist "%BINDIR%\bash.exe" (
     echo 'bash.exe' already exist.
 ) else (
     echo Create 'bash.exe' symlink...
-    mklink %BINDIR%\bash.exe C:\Windows\System32\bash.exe
+    mklink %BINDIR%\bash.exe C:\Windows\System32\wsl.exe
     if %ERRORLEVEL% neq 0 (
         echo ERROR! Failed to create symlink.
         goto :error
