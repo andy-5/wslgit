@@ -14,10 +14,11 @@ representations.
 The latest binary release can be downloaded from the
 [releases page](https://github.com/andy-5/wslgit/releases).
 
-After unzipping the release run the `install.bat` script *as administrator* to 
-create the required symbolic links in the `wslgit\bin` folder.  
+**[Optional 1]** Run the `install.bat` script *as administrator*.  
+The `install.bat` script creates a folder structure similar to the one used by `Git For Windows`, 
+and creates some useful symbolic links in the `wslgit\cmd` and `wslgit\bin` folders.
 
-Put the directory containing the executable (`wslgit\bin`) somewhere on your Windows `Path`
+**[Optional 2]** Add the `wslgit\cmd` directory to your Windows `Path`
 environment variable (user or system).  
 To change the environment variable, type
 `Edit environment variables for your account` into Start menu/Windows search
@@ -28,14 +29,13 @@ You may also need to install the latest
 
 ## Usage in VSCode
 
-VSCode will find the `git` executable in `wslgit\bin` automatically if the path  
-was added to the Windows `Path` environment variable.
+VSCode will find the `git` executable automatically if the two optional installation steps were taken.
 
 If not, set the appropriate path in your VSCode `settings.json`:
 
 ```
 {
-    "git.path": "C:\\CHANGE\\TO\\PATH\\TO\\wslgit\\bin\\git.exe"
+    "git.path": "C:\\CHANGE\\TO\\PATH\\TO\\wslgit\\cmd\\wslgit.exe"
 }
 ```
 
@@ -52,15 +52,14 @@ Git plugin cannot correctly parse the output.
 
 ## Usage from the command line
 
-If you put the path to `wslgit\bin` on the Windows `Path` environment variable 
+If you did the two optional installation steps then 
 you can then just run any git command from a Windows console
 by running `wslgit COMMAND` or `git COMMAND` and it uses the Git version
 installed in WSL.
 
-
 ## Usage in Fork
-[Fork](https://fork.dev) is a Git GUI tool for Windows (and Mac) that use its own portable version of `Git for Windows`.  
-To make Fork use `git from WSL` then go to the preferences and select a custom git instance where you point it to the `git.exe` in the `wslgit\bin` folder.
+
+To make [Fork](https://fork.dev) use `git from WSL` you must have done the first optional installation step (run `install.bat`). Then go to the `Fork` preferences and select a custom git instance where you point it to the `git.exe` in the `wslgit\bin` folder (**not** the *cmd* folder!).
 
 ## Remarks
 
