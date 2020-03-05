@@ -147,7 +147,7 @@ fn format_argument(arg: String) -> String {
 /// Return `true` if the git command can access remotes and therefore might need
 /// the setup of an interactive shell.
 fn git_command_needs_interactive_shell() -> bool {
-    const CMDS: &[&str] = &["clone", "fetch", "pull", "push"];
+    const CMDS: &[&str] = &["clone", "fetch", "pull", "push", "ls-remote"];
     env::args()
         .skip(1)
         .position(|arg| CMDS.iter().position(|&tcmd| tcmd == arg).is_some())
