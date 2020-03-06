@@ -1,6 +1,20 @@
 # WSLGit Changelog
 
 
+## [0.10.0] - unreleased
+
+### Added
+
+- Add install script to create binaries and directory structure
+  similar to Git for Windows. This enables tools to auto-detect Git,
+  if the created directory is added to the Windows `Path`.
+- Add proxy to call `Fork.RI` from WSL.
+
+### Changed
+
+- Add `ls-remote` to commands that use an interactive bash shell.
+
+
 ## [0.9.0] - 2020-01-10
 
 ### Added
