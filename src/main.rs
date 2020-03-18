@@ -16,8 +16,10 @@ mod wsl;
 static mut DOUBLE_DASH_FOUND: bool = false;
 
 fn translate_path_to_unix(argument: String) -> String {
+    let argument = argument.as_bytes();
+
     // An absolute or UNC path must:
-    // 1. Be at the beginning of the string, or after a whitespace, colon, or equal-sign.
+    // 1. Be at the beginning of the string, or after a whitespace, colon, equal-sign or file://.
     // 2. Begin with <drive-letter>:\, <drive-letter>:/, \\ or //.
     // 3. Consist of 0 or more path components that does not contain the characters <>:|?'"\/ or newline,
     //    and are delimited by \ or /.
@@ -28,9 +30,33 @@ fn translate_path_to_unix(argument: String) -> String {
         .expect("Failed to compile ABS_WINPATH_RE regex.");
     }
 
-    let argument = &ABS_WINPATH_RE
-        .replace_all(argument.as_bytes(), &b"${pre}$(wslpath '${path}')"[..])
-        .into_owned();
+    lazy_static! {
+        static ref FILE_ABS_WINPATH_RE: Regex = Regex::new(
+            r#"(?-u)(?P<pre>^file://)(?P<path>([A-Za-z]:[\\/]|\\\\|//)([^<>:|?'"\\/\n]+[\\/]?)*)"#
+        )
+        .expect("Failed to compile FILE_ABS_WINPATH_RE regex.");
+    }
+
+    lazy_static! {
+        static ref TRANSPORT_PROTOCOL_RE: Regex =
+            Regex::new(r#"(?-u)^(ssh|git|https?|ftps?|file)://"#)
+                .expect("Failed to compile TRANSPORT_PROTOCOL_RE regex.");
+    }
+
+    let has_file_prefix = argument.starts_with(b"file://");
+    let has_transport_protocol_prefix = TRANSPORT_PROTOCOL_RE.is_match(argument);
+
+    let argument = if !has_transport_protocol_prefix {
+        ABS_WINPATH_RE
+            .replace_all(argument, &b"${pre}$(wslpath '${path}')"[..])
+            .into_owned()
+    } else if has_file_prefix {
+        FILE_ABS_WINPATH_RE
+            .replace_all(argument, &b"${pre}$(wslpath '${path}')"[..])
+            .into_owned()
+    } else {
+        argument.to_vec()
+    };
 
     // Relative paths that needs to have their slashes changed must:
     // 1. Be at the beginning of the string, or after a whitespace, colon, or equal-sign.
@@ -44,8 +70,8 @@ fn translate_path_to_unix(argument: String) -> String {
         .expect("Failed to compile REL_WINPATH_RE regex.");
     }
 
-    if REL_WINPATH_RE.is_match(argument) {
-        let caps = REL_WINPATH_RE.captures(argument).unwrap();
+    if REL_WINPATH_RE.is_match(&argument) {
+        let caps = REL_WINPATH_RE.captures(&argument).unwrap();
         let path_cap = caps.name("path").unwrap();
         let path = std::str::from_utf8(&path_cap.as_bytes()).unwrap();
 
@@ -53,7 +79,8 @@ fn translate_path_to_unix(argument: String) -> String {
 
         // If the path in the argument exists then it is definitely a relative path,
         // or if the argument is after double-dashes then it is very likely a relative path.
-        let translate_relative_path = double_dash_found == true || Path::new(path).exists();
+        let translate_relative_path =
+            has_file_prefix || double_dash_found || Path::new(path).exists();
 
         if translate_relative_path {
             let wsl_path = path.replace("\\", "/");
@@ -594,6 +621,74 @@ mod tests {
         assert_eq!(
             format_argument("path\\to\\nonexisting\\file.txt".to_string()),
             "path/to/nonexisting/file.txt"
+        );
+    }
+
+    #[test]
+    fn git_url_translation() {
+        // URLs with ssh, git, http[s] or ftp[s] prefix should not be translated
+        assert_eq!(
+            translate_path_to_unix("ssh://user@host.xz:22/path/to/repo.git/".to_string()),
+            "ssh://user@host.xz:22/path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("ssh://user@host.xz/path/to/repo.git/".to_string()),
+            "ssh://user@host.xz/path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("ssh://host.xz/path/to/repo.git/".to_string()),
+            "ssh://host.xz/path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("user@host.xz/path/to/repo.git/".to_string()),
+            "user@host.xz/path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("host.xz/path/to/repo.git/".to_string()),
+            "host.xz/path/to/repo.git/"
+        );
+
+        assert_eq!(
+            translate_path_to_unix("git://host.xz/path/to/repo.git/".to_string()),
+            "git://host.xz/path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("http://host.xz/path/to/repo.git/".to_string()),
+            "http://host.xz/path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("https://host.xz/path/to/repo.git/".to_string()),
+            "https://host.xz/path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("ftp://host.xz/path/to/repo.git/".to_string()),
+            "ftp://host.xz/path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("ftps://host.xz/path/to/repo.git/".to_string()),
+            "ftps://host.xz/path/to/repo.git/"
+        );
+
+        assert_eq!(
+            translate_path_to_unix("file:///path/to/repo.git/".to_string()),
+            "file:///path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("file://C:/path/to/repo.git/".to_string()),
+            "file://$(wslpath 'C:/path/to/repo.git/')"
+        );
+        assert_eq!(
+            translate_path_to_unix("file://C:\\path\\to\\repo.git\\".to_string()),
+            "file://$(wslpath 'C:\\path\\to\\repo.git\\')"
+        );
+
+        assert_eq!(
+            translate_path_to_unix("file://path/to/repo.git/".to_string()),
+            "file://path/to/repo.git/"
+        );
+        assert_eq!(
+            translate_path_to_unix("file://path\\to\\repo.git\\".to_string()),
+            "file://path/to/repo.git/"
         );
     }
 
