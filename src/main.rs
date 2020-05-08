@@ -13,6 +13,8 @@ use regex::bytes::Regex;
 mod fork;
 mod wsl;
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 static mut DOUBLE_DASH_FOUND: bool = false;
 
 fn translate_path_to_unix(argument: String) -> String {
@@ -277,6 +279,7 @@ fn main() {
     cmd_args.push(git_cmd.clone());
 
     if enable_logging() {
+        log(format!("wslgit version {}", VERSION));
         log_arguments(&cmd_args);
     }
 
