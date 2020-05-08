@@ -116,18 +116,18 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
     }
 
     if WSLPATH_RE.is_match(line) {
-        // First use wslpath to convert the path to a windows path and then escape all \ (change to \\) using sed.
-        // This will make UNC paths, which begin with \\, return correctly.
+        // Use wslpath to convert the path to a windows path.
         let line = WSLPATH_RE
             .replace_all(
                 line,
-                &b"${pre}$(WINPATH=$(wslpath -w '${path}'); echo -n ${WINPATH//\\\\/\\\\\\\\})"[..],
+                &b"${pre}$(wslpath -w '${path}')"[..],
             )
             .into_owned();
         let line = std::str::from_utf8(&line).unwrap();
 
         let echo_cmd = format!("echo -n \"{}\"", line);
         let output = Command::new("wsl")
+            .arg("-e")
             .arg("bash")
             .arg("-c")
             .arg(&echo_cmd)
@@ -267,6 +267,7 @@ fn main() {
     let git_cmd: String = git_args.join(" ");
 
     // build the command arguments that are passed to wsl.exe
+    cmd_args.push("-e".to_string());
     cmd_args.push("bash".to_string());
     if use_interactive_shell() {
         cmd_args.push("-ic".to_string());
@@ -507,20 +508,21 @@ mod tests {
             translate_path_to_unix("\\\\path\\to\\file.txt".to_string()),
             "$(wslpath '\\\\path\\to\\file.txt')"
         );
-        // $ git commit --file="//wsl$/Ubuntu-18.04/home/"
+        // $ git commit --file="//wsl$/Ubuntu-20.04/home/"
         assert_eq!(
-            translate_path_to_unix("\\\\wsl$\\Ubuntu-18.04\\home".to_string()),
-            "$(wslpath '\\\\wsl$\\Ubuntu-18.04\\home')"
+            translate_path_to_unix("\\\\wsl$\\Ubuntu-20.04\\home".to_string()),
+            "$(wslpath '\\\\wsl$\\Ubuntu-20.04\\home')"
         );
         assert_eq!(
-            translate_path_to_unix("//wsl$/Ubuntu-18.04/home".to_string()),
-            "$(wslpath '//wsl$/Ubuntu-18.04/home')"
+            translate_path_to_unix("//wsl$/Ubuntu-20.04/home".to_string()),
+            "$(wslpath '//wsl$/Ubuntu-20.04/home')"
         );
     }
 
     #[test]
     fn unix_to_win_path_trans() {
         let check_wslpath = Command::new("wsl")
+            .arg("-e")
             .arg("bash")
             .arg("-c")
             .arg("wslpath C:\\")
@@ -533,16 +535,16 @@ mod tests {
         }
         assert_eq!(
             std::str::from_utf8(&translate_path_to_win(b"/fakemnt/d/some path/a file.md")).unwrap(),
-            "\\\\wsl$\\Ubuntu-18.04\\fakemnt\\d\\some path\\a file.md"
+            "\\\\wsl$\\Ubuntu-20.04\\fakemnt\\d\\some path\\a file.md"
         );
         assert_eq!(
             std::str::from_utf8(&translate_path_to_win(b"origin  /fakemnt/c/path/ (fetch)"))
                 .unwrap(),
-            "origin  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\path\\ (fetch)"
+            "origin  \\\\wsl$\\Ubuntu-20.04\\fakemnt\\c\\path\\ (fetch)"
         );
         assert_eq!(
             std::str::from_utf8(&translate_path_to_win(b"mirror  /fakemnt/c/one/ (fetch)\nmirror  /fakemnt/c/two/ (push)\n")).unwrap(),
-            "mirror  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\one\\ (fetch)\nmirror  \\\\wsl$\\Ubuntu-18.04\\fakemnt\\c\\two\\ (push)\n"
+            "mirror  \\\\wsl$\\Ubuntu-20.04\\fakemnt\\c\\one\\ (fetch)\nmirror  \\\\wsl$\\Ubuntu-20.04\\fakemnt\\c\\two\\ (push)\n"
         );
     }
 
