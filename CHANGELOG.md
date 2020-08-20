@@ -12,7 +12,14 @@
 
 ### Changed
 
-- Add `ls-remote` to commands that use an interactive bash shell.
+- Add `ls-remote` to commands that use an interactive bash shell (#101).
+- Treat file arguments after ` -- ` as relative paths (#102).
+- Include version number in logging output (#105).
+- Invoke `wsl` without default shell (#107).
+
+### Fixed
+
+- Fix translation of URLs that start with a transport protocol (#103).
 
 
 ## [0.9.0] - 2020-01-10
