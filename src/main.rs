@@ -536,19 +536,38 @@ mod tests {
             print!("SKIPPING TEST ... ");
             return;
         }
+        // Since Windows 10 2004 `wslpath` can only translate existing
+        // unix paths to windows paths, so we need to test real filenames.
+        // (see https://github.com/microsoft/WSL/issues/4908)
+        Command::new("wsl")
+            .arg("-e")
+            .arg("bash")
+            .arg("-c")
+            .arg("touch '/tmp/wslgit test file'")
+            .output()
+            .expect("creating tmp test file");
         assert_eq!(
-            std::str::from_utf8(&translate_path_to_win(b"/fakemnt/d/some path/a file.md")).unwrap(),
-            "\\\\wsl$\\Ubuntu-20.04\\fakemnt\\d\\some path\\a file.md"
+            std::str::from_utf8(&translate_path_to_win(b"/tmp/wslgit test file")).unwrap(),
+            "\\\\wsl$\\Ubuntu-20.04\\tmp\\wslgit test file"
         );
         assert_eq!(
-            std::str::from_utf8(&translate_path_to_win(b"origin  /fakemnt/c/path/ (fetch)"))
-                .unwrap(),
-            "origin  \\\\wsl$\\Ubuntu-20.04\\fakemnt\\c\\path\\ (fetch)"
+            std::str::from_utf8(&translate_path_to_win(
+                b"origin  /tmp/wslgit test file (fetch)"
+            ))
+            .unwrap(),
+            "origin  \\\\wsl$\\Ubuntu-20.04\\tmp\\wslgit test file (fetch)"
         );
         assert_eq!(
-            std::str::from_utf8(&translate_path_to_win(b"mirror  /fakemnt/c/one/ (fetch)\nmirror  /fakemnt/c/two/ (push)\n")).unwrap(),
-            "mirror  \\\\wsl$\\Ubuntu-20.04\\fakemnt\\c\\one\\ (fetch)\nmirror  \\\\wsl$\\Ubuntu-20.04\\fakemnt\\c\\two\\ (push)\n"
+            std::str::from_utf8(&translate_path_to_win(b"mirror  /tmp/wslgit test file (fetch)\nmirror  /tmp/wslgit test file (push)\n")).unwrap(),
+            "mirror  \\\\wsl$\\Ubuntu-20.04\\tmp\\wslgit test file (fetch)\nmirror  \\\\wsl$\\Ubuntu-20.04\\tmp\\wslgit test file (push)\n"
         );
+        Command::new("wsl")
+            .arg("-e")
+            .arg("bash")
+            .arg("-c")
+            .arg("rm '/tmp/wslgit test file'")
+            .output()
+            .expect("deleting tmp test file");
     }
 
     #[test]
