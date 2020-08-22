@@ -111,6 +111,7 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
     // 2. Begin with /
     // 3. Not contain the characters: <>:|?'* or newline.
     // Note that when an absolute path is found then the rest of the line is passed to wslpath as argument!
+    // The only exception to this is lines ending in ` (fetch)` or ` (push)`, as in the output of `git remote -v`.
     lazy_static! {
         static ref WSLPATH_RE: Regex =
             Regex::new(r"(?m)(?P<pre>^|[[:space:]])(?P<path>/([^<>:|?'*\n]*/?)*)")
@@ -120,10 +121,18 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
     if WSLPATH_RE.is_match(line) {
         // Use wslpath to convert the path to a windows path.
         let line = WSLPATH_RE
-            .replace_all(
-                line,
-                &b"${pre}$(wslpath -w '${path}')"[..],
-            )
+            .replace_all(line, &b"${pre}$(wslpath -w '${path}')"[..])
+            .into_owned();
+
+        // Fixup output of `git remote -v`, i.e. lines ending in
+        // ` (fetch)` or ` (push)` - move remote types outside the wslpath call.
+        lazy_static! {
+            static ref REMOTE_FIX_RE: Regex =
+                Regex::new(r"(?m)\s(?P<type>(\(fetch\))|(\(push\)))'\)")
+                    .expect("Failed to compile REMOTE_FIX_RE regex");
+        }
+        let line = REMOTE_FIX_RE
+            .replace_all(&line, &b"') ${type}"[..])
             .into_owned();
         let line = std::str::from_utf8(&line).unwrap();
 
