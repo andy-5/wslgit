@@ -1,7 +1,7 @@
 # WSLGit Changelog
 
 
-## [1.0.0] - unreleased
+## [1.0.0] - 2020-08-22
 
 ### Added
 
@@ -158,3 +158,4 @@
 [0.7.0]: https://github.com/andy-5/wslgit/releases/tag/v0.7.0
 [0.8.0]: https://github.com/andy-5/wslgit/releases/tag/v0.8.0
 [0.9.0]: https://github.com/andy-5/wslgit/releases/tag/v0.9.0
+[1.0.0]: https://github.com/andy-5/wslgit/releases/tag/v1.0.0
