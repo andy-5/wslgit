@@ -1,6 +1,13 @@
 # WSLGit Changelog
 
 
+## [1.0.1] - 2020-08-25
+
+### Fixed
+
+- Fix install script for paths with spaces (#110).
+
+
 ## [1.0.0] - 2020-08-22
 
 ### Added
@@ -159,3 +166,4 @@
 [0.8.0]: https://github.com/andy-5/wslgit/releases/tag/v0.8.0
 [0.9.0]: https://github.com/andy-5/wslgit/releases/tag/v0.9.0
 [1.0.0]: https://github.com/andy-5/wslgit/releases/tag/v1.0.0
+[1.0.0]: https://github.com/andy-5/wslgit/releases/tag/v1.0.1
