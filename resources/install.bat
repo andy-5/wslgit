@@ -27,7 +27,7 @@ if exist "%CMDDIR%\git.exe" (
     echo 'git.exe' already exist.
 ) else (
     echo Create 'git.exe' symlink...
-    mklink %CMDDIR%\git.exe %CMDDIR%\wslgit.exe
+    mklink "%CMDDIR%\git.exe" "%CMDDIR%\wslgit.exe"
     if %ERRORLEVEL% neq 0 (
         echo ERROR! Failed to create symlink '%CMDDIR%\git.exe'.
         goto :error
@@ -53,7 +53,7 @@ if exist "%BINDIR%\git.exe" (
     echo 'bin\git.exe' already exist.
 ) else (
     echo Create 'bin\git.exe' symlink...
-    mklink %BINDIR%\git.exe %CMDDIR%\wslgit.exe
+    mklink "%BINDIR%\git.exe" "%CMDDIR%\wslgit.exe"
     if %ERRORLEVEL% neq 0 (
         echo ERROR! Failed to create symlink '%BINDIR%\git.exe'.
         goto :error
@@ -67,7 +67,7 @@ if exist "%BINDIR%\Fork.RI" (
     echo 'bin\Fork.RI' already exist.
 ) else (
     echo Create 'bin\Fork.RI' symlink...
-    mklink %BINDIR%\Fork.RI %CMDDIR%\Fork.RI
+    mklink "%BINDIR%\Fork.RI" "%CMDDIR%\Fork.RI"
     if %ERRORLEVEL% neq 0 (
         echo ERROR! Failed to create symlink '%BINDIR%\Fork.RI'.
         goto :error
@@ -81,7 +81,7 @@ if exist "%BINDIR%\sh.exe" (
     echo 'bin\sh.exe' already exist.
 ) else (
     echo Create 'bin\sh.exe' symlink...
-    mklink %BINDIR%\sh.exe C:\Windows\System32\wsl.exe
+    mklink "%BINDIR%\sh.exe" "C:\Windows\System32\wsl.exe"
     if %ERRORLEVEL% neq 0 (
         echo ERROR! Failed to create symlink '%BINDIR%\sh.exe'.
         goto :error
@@ -95,7 +95,7 @@ if exist "%BINDIR%\bash.exe" (
     echo 'bin\bash.exe' already exist.
 ) else (
     echo Create 'bin\bash.exe' symlink...
-    mklink %BINDIR%\bash.exe C:\Windows\System32\wsl.exe
+    mklink "%BINDIR%\bash.exe" "C:\Windows\System32\wsl.exe"
     if %ERRORLEVEL% neq 0 (
         echo ERROR! Failed to create symlink '%BINDIR%\bash.exe'.
         goto :error
