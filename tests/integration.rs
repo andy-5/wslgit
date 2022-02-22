@@ -277,4 +277,15 @@ mod integration {
             .stdout(predicate::str::contains("WSLGIT=1"))
             .stdout(predicate::str::contains("WSLENV=hello:WSLGIT"));
     }
+
+    #[test]
+    fn shell_environment_variable() {
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            // Use pretty format to call 'printenv SHELL'
+            .args(&["log", "-1", "--pretty=format:$(printenv SHELL)"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("/usr/bin/bash"));
+    }
 }
