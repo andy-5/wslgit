@@ -70,7 +70,7 @@ mod integration {
         // This is really stupid, hopefully first line of Cargo.toml won't change.
         Command::cargo_bin(env!("CARGO_PKG_NAME"))
             .unwrap()
-            .args(&["log", "-n1", "-L 1,1:Cargo.toml", "--", "Cargo.toml"])
+            .args(&["log", "-n1", "-L 1,1:Cargo.toml"])
             .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
             .assert()
             .success()
