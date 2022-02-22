@@ -279,7 +279,7 @@ fn main() {
 
     // build the command arguments that are passed to wsl.exe
     cmd_args.push("-e".to_string());
-    cmd_args.push("bash".to_string());
+    cmd_args.push("/usr/bin/bash".to_string());
     if use_interactive_shell() {
         cmd_args.push("-ic".to_string());
     } else {
