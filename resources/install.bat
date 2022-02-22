@@ -14,15 +14,6 @@ set CMDDIR=%CWD%cmd
 cd %CWD%
 
 echo.
-echo Make sure Fork.RI is executable in WSL...
-wsl -- chmod +x cmd/Fork.RI
-if %ERRORLEVEL% neq 0 (
-    echo ERROR! Failed to make Fork.RI executable in WSL.
-    goto :error
-)
-echo OK.
-
-echo.
 if exist "%CMDDIR%\git.exe" (
     echo 'git.exe' already exist.
 ) else (

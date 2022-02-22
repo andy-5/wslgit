@@ -61,6 +61,10 @@ installed in WSL.
 
 To make [Fork](https://fork.dev) use `git from WSL` you must have done the first optional installation step (run `install.bat`). Then go to the `Fork` preferences and select a custom git instance where you point it to the `git.exe` in the `wslgit\bin` folder (**not** the *cmd* folder!).
 
+If getting an error message about not being able to execute `Fork.RI` then make
+sure that the `Fork.RI` script is executable inside WSL (run `chmod +x Fork.RI`
+if needed).
+
 ## Remarks
 
 Currently, the path translation and shell escaping is very limited,
