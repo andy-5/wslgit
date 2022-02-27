@@ -3,6 +3,14 @@
 
 ## [1.1.0] - unreleased
 
+### Changed
+
+- Use full path to bash (#119)
+
+### Fixed
+
+- Fix test errors
+
 
 ## [1.0.1] - 2020-08-25
 

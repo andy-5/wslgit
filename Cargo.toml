@@ -5,9 +5,12 @@ authors = ["Andreas Riffnaller-Schiefer <andreas.schiefer@gmail.com>"]
 license = "MIT"
 
 [dependencies]
-regex = "1"
+regex = "1.5"
 lazy_static = "1.4"
 
 [dev-dependencies]
 assert_cmd = "1.0"
 predicates = "1.0"
+
+[profile.release]
+strip = true
