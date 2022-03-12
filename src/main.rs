@@ -539,14 +539,18 @@ mod tests {
             .arg("-c")
             .arg("wslpath C:\\")
             .output();
-        if check_wslpath.is_err() || !check_wslpath.expect("bash output").status.success() {
-            // Skip test if `wslpath` is not available (e.g. in CI)
-            // Either bash was not found, or running `wslpath` returned an error code
+        let prefix_bytes = translate_path_to_win(b"/");
+        let prefix = std::str::from_utf8(&prefix_bytes).unwrap();
+        if check_wslpath.is_err()
+            || !check_wslpath.expect("bash output").status.success()
+            || prefix == ""
+        {
+            // Skip test if `wslpath` is not available (e.g. in CI).
+            // Either bash was not found, or running `wslpath` returned an error
+            // code or an empty string.
             print!("SKIPPING TEST ... ");
             return;
         }
-        let prefix_bytes = translate_path_to_win(b"/");
-        let prefix = std::str::from_utf8(&prefix_bytes).unwrap();
         // Since Windows 10 2004 `wslpath` can only translate existing
         // unix paths to windows paths, so we need to test real filenames.
         // (see https://github.com/microsoft/WSL/issues/4908)
