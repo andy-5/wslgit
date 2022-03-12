@@ -545,6 +545,8 @@ mod tests {
             print!("SKIPPING TEST ... ");
             return;
         }
+        let prefix_bytes = translate_path_to_win(b"/");
+        let prefix = std::str::from_utf8(&prefix_bytes).unwrap();
         // Since Windows 10 2004 `wslpath` can only translate existing
         // unix paths to windows paths, so we need to test real filenames.
         // (see https://github.com/microsoft/WSL/issues/4908)
@@ -557,18 +559,18 @@ mod tests {
             .expect("creating tmp test file");
         assert_eq!(
             std::str::from_utf8(&translate_path_to_win(b"/tmp/wslgit test file")).unwrap(),
-            "\\\\wsl$\\Ubuntu-20.04\\tmp\\wslgit test file"
+            format!("{}tmp\\wslgit test file", prefix)
         );
         assert_eq!(
             std::str::from_utf8(&translate_path_to_win(
                 b"origin  /tmp/wslgit test file (fetch)"
             ))
             .unwrap(),
-            "origin  \\\\wsl$\\Ubuntu-20.04\\tmp\\wslgit test file (fetch)"
+            format!("origin  {}tmp\\wslgit test file (fetch)", prefix)
         );
         assert_eq!(
             std::str::from_utf8(&translate_path_to_win(b"mirror  /tmp/wslgit test file (fetch)\nmirror  /tmp/wslgit test file (push)\n")).unwrap(),
-            "mirror  \\\\wsl$\\Ubuntu-20.04\\tmp\\wslgit test file (fetch)\nmirror  \\\\wsl$\\Ubuntu-20.04\\tmp\\wslgit test file (push)\n"
+            format!("mirror  {0}tmp\\wslgit test file (fetch)\nmirror  {0}tmp\\wslgit test file (push)\n", prefix)
         );
         Command::new("wsl")
             .arg("-e")
