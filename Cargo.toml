@@ -1,6 +1,6 @@
 [package]
 name = "wslgit"
-version = "1.1.0"
+version = "1.2.0"
 authors = ["Andreas Riffnaller-Schiefer <andreas.schiefer@gmail.com>"]
 license = "MIT"
 
