@@ -1,6 +1,6 @@
 # WSLGit Changelog
 
-## [1.1.1] - unreleased
+## [1.1.1] - 2022-03-22
 
 ### Fixed
 
@@ -184,4 +184,5 @@
 [0.9.0]: https://github.com/andy-5/wslgit/releases/tag/v0.9.0
 [1.0.0]: https://github.com/andy-5/wslgit/releases/tag/v1.0.0
 [1.0.1]: https://github.com/andy-5/wslgit/releases/tag/v1.0.1
-[1.0.1]: https://github.com/andy-5/wslgit/releases/tag/v1.1.0
+[1.1.0]: https://github.com/andy-5/wslgit/releases/tag/v1.1.0
+[1.1.1]: https://github.com/andy-5/wslgit/releases/tag/v1.1.1
