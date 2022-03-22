@@ -1,5 +1,11 @@
 # WSLGit Changelog
 
+## [1.1.1] - 2022-03-22
+
+### Fixed
+
+- Use standard bash executable (#122)
+
 
 ## [1.1.0] - 2022-03-13
 
@@ -179,3 +185,4 @@
 [1.0.0]: https://github.com/andy-5/wslgit/releases/tag/v1.0.0
 [1.0.1]: https://github.com/andy-5/wslgit/releases/tag/v1.0.1
 [1.1.0]: https://github.com/andy-5/wslgit/releases/tag/v1.1.0
+[1.1.1]: https://github.com/andy-5/wslgit/releases/tag/v1.1.1

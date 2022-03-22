@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "wslgit"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "assert_cmd",
  "lazy_static",

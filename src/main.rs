@@ -15,6 +15,8 @@ mod wsl;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
+const BASH_EXECUTABLE: &str = "/bin/bash";
+
 static mut DOUBLE_DASH_FOUND: bool = false;
 
 fn translate_path_to_unix(argument: String) -> String {
@@ -139,7 +141,7 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
         let echo_cmd = format!("echo -n \"{}\"", line);
         let output = Command::new("wsl")
             .arg("-e")
-            .arg("bash")
+            .arg(BASH_EXECUTABLE)
             .arg("-c")
             .arg(&echo_cmd)
             .output()
@@ -279,7 +281,7 @@ fn main() {
 
     // build the command arguments that are passed to wsl.exe
     cmd_args.push("-e".to_string());
-    cmd_args.push("/usr/bin/bash".to_string());
+    cmd_args.push(BASH_EXECUTABLE.to_string());
     if use_interactive_shell() {
         cmd_args.push("-ic".to_string());
     } else {
@@ -535,7 +537,7 @@ mod tests {
     fn unix_to_win_path_trans() {
         let check_wslpath = Command::new("wsl")
             .arg("-e")
-            .arg("bash")
+            .arg(BASH_EXECUTABLE)
             .arg("-c")
             .arg("wslpath C:\\")
             .output();
@@ -556,7 +558,7 @@ mod tests {
         // (see https://github.com/microsoft/WSL/issues/4908)
         Command::new("wsl")
             .arg("-e")
-            .arg("bash")
+            .arg(BASH_EXECUTABLE)
             .arg("-c")
             .arg("touch '/tmp/wslgit test file'")
             .output()
@@ -578,7 +580,7 @@ mod tests {
         );
         Command::new("wsl")
             .arg("-e")
-            .arg("bash")
+            .arg(BASH_EXECUTABLE)
             .arg("-c")
             .arg("rm '/tmp/wslgit test file'")
             .output()
