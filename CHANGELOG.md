@@ -1,8 +1,10 @@
 # WSLGit Changelog
 
-## [1.2.0] - unreleased
+## [1.1.1] - unreleased
 
-nothing yet
+### Fixed
+
+- Use standard bash executable (#122)
 
 
 ## [1.1.0] - 2022-03-13

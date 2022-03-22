@@ -286,6 +286,6 @@ mod integration {
             .args(&["log", "-1", "--pretty=format:$(printenv SHELL)"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("/usr/bin/bash"));
+            .stdout(predicate::str::contains("/bin/bash"));
     }
 }
