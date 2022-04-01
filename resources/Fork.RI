@@ -3,7 +3,7 @@
 # converted to a windows path.
 # Expects the environment variable FORK_RI_EXE_PATH to contain the path to Fork.RI.exe.
 
-UNAME=$(uname -a)
+UNAME="$(uname -a)"
 # 'uname -a' returns:
 # WSL1: Linux PCNAME 4.4.0-17134-Microsoft #706-Microsoft Mon Apr 01 18:13:00 PST 2019 x86_64 x86_64 x86_64 GNU/Linux
 # WSL2: Linux DESKTOP-4P30KCU 4.19.104-microsoft-standard #1 SMP Wed Feb 19 06:37:35 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
@@ -13,12 +13,12 @@ UNAME=$(uname -a)
 
 if [[ $UNAME == *icrosoft* ]]; then
     # in a wsl shell
-    WSL_BUILD=$(sed -E 's/^.+-([0-9]+)-Microsoft.*/\1/' <<< $UNAME)
-    if [ -z $WSL_BUILD ]; then
+    WSL_BUILD=$(sed -E 's/^.+-([0-9]+)-Microsoft.*/\1/' <<< "$UNAME")
+    if [ -z "$WSL_BUILD" ]; then
         WSL_BUILD=0
     fi
 
-    if [ $WSL_BUILD -ge 17046 || ! -z $WSL_INTEROP ]; then
+    if [ $WSL_BUILD -ge 17046 ] || [ -n "$WSL_INTEROP" ]; then
         # WSLPATH is available since WSL build 17046
 
         # Make sure that Fork.RI.exe is executable.
