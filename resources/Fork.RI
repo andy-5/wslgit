@@ -21,6 +21,13 @@ if [[ $UNAME == *icrosoft* ]]; then
     if [ $WSL_BUILD -ge 17046 ] || [ -n "$WSL_INTEROP" ]; then
         # WSLPATH is available since WSL build 17046
 
+        # Make sure that FORK_RI_EXE_PATH does not contain any badly escaped spaces.
+        # It can happen when using Windows' short paths inside Fork's custom git instance path
+        # Example: Fork is configured with "C:\Users\SURNAM~1\wslgit\bin\git.exe" instead of "C:\Users\Surname Lastname\wslgit\bin\git.exe"
+        # which may be a valid use case as is does not support spaces in paths.
+        # FORK_RI_EXE_PATH would contain "/mnt/c/Users/Surname/ Lastname/wslgit/bin/Fork.RI.exe" before the following sed call
+        FORK_RI_EXE_PATH="$(sed 's/\/ / /g' <<< "$FORK_RI_EXE_PATH")"
+
         # Make sure that Fork.RI.exe is executable.
         chmod +x "$FORK_RI_EXE_PATH"
 
