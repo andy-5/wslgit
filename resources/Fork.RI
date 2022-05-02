@@ -13,7 +13,7 @@ UNAME="$(uname -a)"
 
 if [[ $UNAME == *icrosoft* ]]; then
     # in a wsl shell
-    WSL_BUILD=$(cmd.exe /c "systeminfo" | grep -E -i "build [0-9]+" | sed -E 's/^.*build ([0-9]+).*$/\1/')
+    WSL_BUILD=$(cmd.exe /c "systeminfo" | grep -E -i "build [0-9]+" | sed -E 's/^.*build ([0-9]+).*$/\1/I')
     if [ -z "$WSL_BUILD" ]; then
         WSL_BUILD=0
     fi
