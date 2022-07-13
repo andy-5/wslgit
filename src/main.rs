@@ -279,6 +279,45 @@ fn get_working_directory(current_dir: PathBuf, args: &[String]) -> String {
     return working_dir.to_str().unwrap().to_string();
 }
 
+/// Try to find the WSL distribution name from the provided `path`.
+///
+/// An UNC prefix consists of \\server\share\, which is then followed by a path.
+/// When accessing a WSL filesystem using the `\\wsl$\dist\` UNC prefix then the
+/// distribution name can be extracted from the second component of the UNC
+/// prefix.
+///
+/// Returns the distribution name or None.
+fn get_wsl_dist_name(path: &str) -> Option<String> {
+    const UNC_SERVER_WSL: &str = "\\\\wsl$\\";
+    const UNC_SERVER_WSL_LOCALHOST: &str = "\\\\wsl.localhost\\";
+
+    let unc_path_without_server: Option<&str> = if path.starts_with(UNC_SERVER_WSL) {
+        Some(&path[UNC_SERVER_WSL.len()..])
+    } else if path.starts_with(UNC_SERVER_WSL_LOCALHOST) {
+        Some(&path[UNC_SERVER_WSL_LOCALHOST.len()..])
+    } else {
+        None
+    };
+
+    let wsl_dist_name = match unc_path_without_server {
+        Some(p) => {
+            // the string p starts with the UNC 'share', which is the wsl dist name
+            let (dist_name, _) = p.split_once('\\').unwrap();
+            Some(dist_name.to_string())
+        }
+        None => {
+            if let Ok(default_dist) = env::var("WSLGIT_DEFAULT_DIST") {
+                Some(default_dist)
+            } else {
+                // Use wsl default dist
+                None
+            }
+        }
+    };
+
+    return wsl_dist_name;
+}
+
 fn enable_logging() -> bool {
     if let Ok(enable_log_flag) = env::var("WSLGIT_ENABLE_LOGGING") {
         if enable_log_flag == "true" || enable_log_flag == "1" {
@@ -896,4 +935,38 @@ mod tests {
         );
     }
 
+    #[test]
+    fn wsl_dist_name() {
+        env::remove_var("WSLGIT_DEFAULT_DIST");
+        assert_eq!(
+            get_wsl_dist_name(&r"\\wsl$\dist-name\a\b\c".to_string()),
+            Some("dist-name".to_string())
+        );
+        assert_eq!(
+            get_wsl_dist_name(&r"\\wsl.localhost\dist-name\a\b\c".to_string()),
+            Some("dist-name".to_string())
+        );
+        assert_eq!(
+            get_wsl_dist_name(&r"\\server\dist-name\a\b\c".to_string()),
+            None
+        );
+        assert_eq!(get_wsl_dist_name(&r"C:\a\b\c".to_string()), None);
+    }
+
+    #[test]
+    fn wsl_default_dist_name() {
+        env::set_var("WSLGIT_DEFAULT_DIST", "some-dist");
+        assert_eq!(
+            get_wsl_dist_name(&r"\\wsl$\dist-name\a\b\c".to_string()),
+            Some("dist-name".to_string())
+        );
+        assert_eq!(
+            get_wsl_dist_name(&r"\\server\dist-name\a\b\c".to_string()),
+            Some("some-dist".to_string())
+        );
+        assert_eq!(
+            get_wsl_dist_name(&r"C:\a\b\c".to_string()),
+            Some("some-dist".to_string())
+        );
+    }
 }
