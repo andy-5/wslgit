@@ -27,6 +27,27 @@ and use that tool to edit `Path`.
 You may also need to install the latest
 [*Microsoft Visual C++ Redistributable for Visual Studio 2017*](https://aka.ms/vs/15/release/vc_redist.x64.exe).
 
+## WSL distributions and file systems
+
+When accessing files on the filesystem in a WSL distribution using the UNC path
+(`\\wsl$\dist\path` or `\\wsl.localhost\dist\path`) then the distribution used
+is extracted from the path. This means that git must be setup correctly in all
+distributions that you intend to access.
+
+When accessing files on the Windows filesystem or a mapped network drive the 
+default WSL distribution is used unless the
+[`WSLGIT_DEFAULT_DIST`](#wslgit_default_dist) environment variable is set.
+
+If the default WSL distribution is of WSL2 type then it is highly recommended to
+set the `WSLGIT_DEFAULT_DIST` to the name of a WSL1 instance since WSL1 is both
+quicker at accessing the Windows filesystem and can access mapped network drives
+which WSL2 cannot.
+
+> Tip: use symlinks to map files and folders in all distributions to a common
+> directory to avoid having to maintain multiple copies, for example you can
+> link the `~/.ssh` folder in all WSL dists to the `.ssh` folder in your Windows
+> home folder.
+
 ## Usage in VSCode
 
 VSCode will find the `git` executable automatically if the two optional installation steps were taken.
@@ -104,6 +125,14 @@ the forced startup script from `BASH_ENV` contains everything you need, and
 therefore also starts bash in non-interactive mode.
 
 This feature is only available in Windows 10 builds 17063 and later.
+
+### WSLGIT_DEFAULT_DIST
+
+Set a Windows environment variable called `WSLGIT_DEFAULT_DIST` to the name of a
+WSL distribution to use instead of the WSL default distribution when accessing
+files on the Windows filesystem or from mapped network shares.
+
+> Note, to access files on a mapped network drive a WSL1 distribution must be used.
 
 ### WSLGIT
 `wslgit` set a variable called `WSLGIT` to `1` and shares it to WSL. This variable can be used in `.bashrc` to 
