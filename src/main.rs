@@ -361,6 +361,18 @@ fn main() {
 
     let git_cmd: String = git_args.join(" ");
 
+    let curr_dir = env::current_dir().unwrap();
+    // Assumes that the first element in args is the executable
+    let args: Vec<String> = env::args().skip(1).collect();
+    let working_directory = get_working_directory(curr_dir, &args);
+    match get_wsl_dist_name(&working_directory) {
+        Some(wsl_dist) => {
+            cmd_args.push("--distribution".to_string());
+            cmd_args.push(wsl_dist.to_string());
+        }
+        None => {}
+    }
+
     // build the command arguments that are passed to wsl.exe
     cmd_args.push("-e".to_string());
     cmd_args.push(BASH_EXECUTABLE.to_string());
