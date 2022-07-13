@@ -384,7 +384,11 @@ fn main() {
     cmd_args.push(git_cmd.clone());
 
     if enable_logging() {
-        log(format!("wslgit version {}", VERSION));
+        log(format!(
+            "wslgit version {}, current_dir {}",
+            VERSION,
+            env::current_dir().unwrap().to_str().unwrap().to_string()
+        ));
         log_arguments(&cmd_args);
     }
 
