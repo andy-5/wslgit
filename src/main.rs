@@ -2,7 +2,7 @@ use std::env;
 
 use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 #[macro_use]
@@ -235,6 +235,50 @@ fn use_interactive_shell() -> bool {
     git_command_needs_interactive_shell()
 }
 
+/// Find the working directory by starting from the current directory and applying
+/// any paths from `-C` or `--work-tree` arguments.
+///
+/// `--git-dir` is ignored, it is assumed that both the work-tree and git-dir
+/// are on the same file system/same wsl distribution.
+///
+/// Returns the working directory as a String.
+fn get_working_directory(current_dir: PathBuf, args: &[String]) -> String {
+    let mut working_dir = current_dir;
+    let mut work_tree = env::var("GIT_WORK_TREE").unwrap_or("".to_string());
+
+    let mut skip_next = false;
+    let mut next_is_path = false;
+
+    for arg in args {
+        if skip_next {
+            skip_next = false;
+        } else if next_is_path {
+            next_is_path = false;
+            // let path = PathBuf::from(arg);
+            working_dir.push(arg);
+        } else if arg == "-c" {
+            // `-c` expects a second argument, so skip next argument.
+            skip_next = true;
+        } else if arg == "-C" {
+            // `-C` expects a second argument that is a path
+            next_is_path = true;
+        } else if arg.starts_with("--work-tree=") {
+            work_tree = arg[12..].to_string();
+        } else if !arg.starts_with("-") {
+            // First argument that doesn't start with '-' (or '--') is the git
+            // command; clone, commit etc.
+            break;
+        }
+    }
+
+    // Finally apply the path from any "--work-tree" argument on the current working dir
+    if work_tree.len() > 0 {
+        working_dir.push(work_tree);
+    }
+
+    return working_dir.to_str().unwrap().to_string();
+}
+
 fn enable_logging() -> bool {
     if let Ok(enable_log_flag) = env::var("WSLGIT_ENABLE_LOGGING") {
         if enable_log_flag == "true" || enable_log_flag == "1" {
@@ -274,7 +318,6 @@ fn log(message: String) {
 fn main() {
     let mut cmd_args = Vec::new();
     let mut git_args: Vec<String> = vec![String::from("git")];
-
     git_args.extend(env::args().skip(1).map(format_argument));
 
     let git_cmd: String = git_args.join(" ");
@@ -760,4 +803,97 @@ mod tests {
             "-c \"credential.helper=$(wslpath 'C:/Program Files/SmartGit/lib/credentials.cmd')\""
         );
     }
+
+    #[test]
+    fn get_working_directory_test() {
+        env::remove_var("GIT_WORK_TREE");
+
+        let args: Vec<String> = vec![];
+        assert_eq!(
+            get_working_directory(PathBuf::from("C:\\repo\\"), &args),
+            "C:\\repo\\".to_string()
+        );
+        assert_eq!(
+            get_working_directory(PathBuf::from("\\\\wsl$\\dist-name\\repo\\"), &args),
+            "\\\\wsl$\\dist-name\\repo\\".to_string()
+        );
+
+        let args: Vec<String> = vec!["cmd".into()];
+        assert_eq!(
+            get_working_directory(PathBuf::from("C:\\repo\\"), &args),
+            "C:\\repo\\".to_string()
+        );
+
+        let args: Vec<String> = vec!["-c".into(), "arg".into(), "cmd".into()];
+        assert_eq!(
+            get_working_directory(PathBuf::from("C:\\repo\\"), &args),
+            "C:\\repo\\".to_string()
+        );
+
+        let args: Vec<String> = vec![
+            "-c".into(),
+            "arg".into(),
+            "-C".into(),
+            "relative".into(),
+            "cmd".into(),
+        ];
+        assert_eq!(
+            get_working_directory(PathBuf::from("C:\\repo\\"), &args),
+            "C:\\repo\\relative".to_string()
+        );
+
+        let args: Vec<String> = vec![
+            "-c".into(),
+            "arg".into(),
+            "-C".into(),
+            "C:\\absolute".into(),
+            "cmd".into(),
+        ];
+        assert_eq!(
+            get_working_directory(PathBuf::from("C:\\repo\\"), &args),
+            "C:\\absolute".to_string()
+        );
+
+        let args: Vec<String> = vec![
+            "-c".into(),
+            "arg".into(),
+            "-C".into(),
+            "a".into(),
+            "-C".into(),
+            "b".into(),
+            "cmd".into(),
+        ];
+        assert_eq!(
+            get_working_directory(PathBuf::from("C:\\repo\\"), &args),
+            "C:\\repo\\a\\b".to_string()
+        );
+
+        env::set_var("GIT_WORK_TREE", "b");
+        let args: Vec<String> = vec![
+            "-c".into(),
+            "arg".into(),
+            "-C".into(),
+            "a".into(),
+            "cmd".into(),
+        ];
+        assert_eq!(
+            get_working_directory(PathBuf::from("C:\\repo\\"), &args),
+            "C:\\repo\\a\\b".to_string()
+        );
+
+        env::set_var("GIT_WORK_TREE", "b");
+        let args: Vec<String> = vec![
+            "-c".into(),
+            "arg".into(),
+            "-C".into(),
+            "a".into(),
+            "--work-tree=c".into(),
+            "cmd".into(),
+        ];
+        assert_eq!(
+            get_working_directory(PathBuf::from("C:\\repo\\"), &args),
+            "C:\\repo\\a\\c".to_string()
+        );
+    }
+
 }
