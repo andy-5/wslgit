@@ -1,5 +1,13 @@
 # WSLGit Changelog
 
+## [1.2.0] - unreleased
+
+### Added
+
+- Support setting preferred WSL distribution
+- Detect and use WSL distribution specified in UNC paths
+
+
 ## [1.1.1] - 2022-03-22
 
 ### Fixed
@@ -186,3 +194,4 @@
 [1.0.1]: https://github.com/andy-5/wslgit/releases/tag/v1.0.1
 [1.1.0]: https://github.com/andy-5/wslgit/releases/tag/v1.1.0
 [1.1.1]: https://github.com/andy-5/wslgit/releases/tag/v1.1.1
+[1.2.0]: https://github.com/andy-5/wslgit/releases/tag/v1.2.0
