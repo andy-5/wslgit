@@ -354,34 +354,63 @@ fn log(message: String) {
     write!(&f, "{}\n", message).unwrap();
 }
 
+fn is_linux_path(working_directory :&String) -> bool {
+    working_directory.starts_with("/")
+}
+
 fn main() {
     let mut cmd_args = Vec::new();
-    let mut git_args: Vec<String> = vec![String::from("git")];
-    git_args.extend(env::args().skip(1).map(format_argument));
-
-    let git_cmd: String = git_args.join(" ");
 
     let curr_dir = env::current_dir().unwrap();
     // Assumes that the first element in args is the executable
     let args: Vec<String> = env::args().skip(1).collect();
     let working_directory = get_working_directory(curr_dir, &args);
-    match get_wsl_dist_name(&working_directory) {
+
+    let mut launch_program = "wsl".to_string();
+    let use_wsl = match get_wsl_dist_name(&working_directory) {
         Some(wsl_dist) => {
             cmd_args.push("--distribution".to_string());
             cmd_args.push(wsl_dist.to_string());
+            true
         }
-        None => {}
-    }
+        None => {
+            if is_linux_path(&working_directory) {
+                true
+            } else if let Ok(win_git) = env::var("WSLGIT_WIN_GIT") {
+                launch_program = win_git.clone();
+                false
+            } else {
+                true // note: using wsl git for windows path might be slow
+            }
+        }
+    };
 
-    // build the command arguments that are passed to wsl.exe
-    cmd_args.push("-e".to_string());
-    cmd_args.push(BASH_EXECUTABLE.to_string());
-    if use_interactive_shell() {
-        cmd_args.push("-ic".to_string());
-    } else {
-        cmd_args.push("-c".to_string());
+    let git_cmd = {
+        let mut git_args = vec!["git".to_string()];
+        let args_it = env::args().skip(1);
+        if use_wsl {
+            git_args.extend(args_it.map(format_argument));
+        }
+        else {
+            git_args.extend(args_it);
+        }
+        git_args.join(" ")
+    };
+
+    if use_wsl {
+        // build the command arguments that are passed to wsl.exe
+        cmd_args.push("-e".to_string());
+        cmd_args.push(BASH_EXECUTABLE.to_string());
+        if use_interactive_shell() {
+            cmd_args.push("-ic".to_string());
+        } else {
+            cmd_args.push("-c".to_string());
+        }
+        cmd_args.push(git_cmd.clone());
     }
-    cmd_args.push(git_cmd.clone());
+    else {
+        cmd_args.extend(env::args().skip(1));
+    }
 
     if enable_logging() {
         log(format!(
@@ -392,10 +421,12 @@ fn main() {
         log_arguments(&cmd_args);
     }
 
-    wsl::share_val("WSLGIT", "1", false);
+    if use_wsl {
+        wsl::share_val("WSLGIT", "1", false);
+    }
 
     // setup the git subprocess launched inside WSL
-    let mut git_proc_setup = Command::new("wsl");
+    let mut git_proc_setup = Command::new(launch_program);
     git_proc_setup.args(&cmd_args);
 
     let status;
@@ -403,7 +434,7 @@ fn main() {
     // add git commands that must use translate_path_to_win
     const TRANSLATED_CMDS: &[&str] = &["rev-parse", "remote", "init"];
 
-    let translate_output = env::args()
+    let translate_output = use_wsl && env::args()
         .skip(1)
         .position(|arg| {
             TRANSLATED_CMDS
