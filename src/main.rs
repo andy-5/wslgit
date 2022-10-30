@@ -206,15 +206,19 @@ fn git_command_needs_interactive_shell() -> bool {
         .is_some()
 }
 
-fn use_interactive_shell() -> bool {
+fn use_shell_arg() -> Option<&'static str> {
+    const INTERACTIVE_ARG :&str = "-i";
+    const LOGIN_ARG :&str = "-l";
+
     // check for explicit environment variable setting
-    if let Ok(interactive_flag) = env::var("WSLGIT_USE_INTERACTIVE_SHELL") {
+    if let Ok(interactive_flag) = env::var("WSLGIT_SHELL") {
         if interactive_flag == "false" || interactive_flag == "0" {
-            return false;
+            return None;
         } else if interactive_flag == "smart" {
-            return git_command_needs_interactive_shell();
+        } else if interactive_flag == "login" {
+            return Some(LOGIN_ARG);
         } else {
-            return true;
+            return Some(INTERACTIVE_ARG);
         }
     }
     // check for advanced usage indicated by BASH_ENV and WSLENV contains BASH_ENV
@@ -227,12 +231,17 @@ fn use_interactive_shell() -> bool {
                     .expect("Failed to compile BASH_ENV regex");
             }
             if BASH_ENV_RE.is_match(wslenv.as_bytes()) {
-                return false;
+                return None;
             }
         }
     }
     // default
-    git_command_needs_interactive_shell()
+    if git_command_needs_interactive_shell() {
+        Some(INTERACTIVE_ARG)
+    }
+    else {
+        None
+    }
 }
 
 /// Find the working directory by starting from the current directory and applying
@@ -401,11 +410,10 @@ fn main() {
         // build the command arguments that are passed to wsl.exe
         cmd_args.push("-e".to_string());
         cmd_args.push(BASH_EXECUTABLE.to_string());
-        if use_interactive_shell() {
-            cmd_args.push("-ic".to_string());
-        } else {
-            cmd_args.push("-c".to_string());
+        if let Some(shell_arg) = use_shell_arg() {
+            cmd_args.push(shell_arg.to_string());
         }
+        cmd_args.push("-c".to_string());
         cmd_args.push(git_cmd.clone());
     }
     else {
