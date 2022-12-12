@@ -7,6 +7,10 @@
 - Support setting preferred WSL distribution
 - Detect and use WSL distribution specified in UNC paths
 
+### Fixed
+
+- Escape special characters `<`, `>`, and `!`
+
 
 ## [1.1.1] - 2022-03-22
 
