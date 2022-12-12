@@ -84,6 +84,14 @@ mod integration {
     fn long_argument_with_invalid_characters_and_spaces() {
         Command::cargo_bin(env!("CARGO_PKG_NAME"))
             .unwrap()
+            .args(&["log", "-n1", "--pretty=format:<!--RevisionMessageEnd-->"])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success()
+            .stdout("<!--RevisionMessageEnd-->");
+
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
             .args(&["log", "-n1", "--pretty=format:a ( b | c )"])
             .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
             .assert()

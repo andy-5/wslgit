@@ -160,7 +160,11 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
 }
 
 fn escape_characters(arg: String) -> String {
-    arg.replace("\n", "$'\n'").replace("\"", "\\\"")
+    arg.replace("\n", "$'\n'")
+        .replace("\"", "\\\"")
+        .replace("<", "\\<")
+        .replace(">", "\\>")
+        .replace("!", "\\!")
 }
 
 fn invalid_characters(ch: char) -> bool {
@@ -515,6 +519,10 @@ mod tests {
         assert_eq!(
             super::escape_characters("ab\ncd ef".to_string()),
             "ab$\'\n\'cd ef"
+        );
+        assert_eq!(
+            super::escape_characters("--pretty=format:%H±.%aN±.%aE±.%at±.%cN±.%cE±.%ct±.%P±.%B<!--RevisionMessageEnd-->".to_string()),
+            "--pretty=format:%H±.%aN±.%aE±.%at±.%cN±.%cE±.%ct±.%P±.%B\\<\\!--RevisionMessageEnd--\\>"
         );
         // Long arguments with newlines...
         assert_eq!(
