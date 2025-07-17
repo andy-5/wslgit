@@ -359,6 +359,14 @@ fn log(message: String) {
 }
 
 fn main() {
+    if enable_logging() {
+        log(format!(
+            "wslgit version {}, current_dir {}",
+            VERSION,
+            env::current_dir().unwrap().to_str().unwrap().to_string()
+        ));
+    }
+
     let mut cmd_args = Vec::new();
     let mut git_args: Vec<String> = vec![String::from("git")];
     git_args.extend(env::args().skip(1).map(format_argument));
@@ -374,7 +382,33 @@ fn main() {
             cmd_args.push("--distribution".to_string());
             cmd_args.push(wsl_dist.to_string());
         }
-        None => {}
+        None => {
+            if enable_logging() {
+                log("no distribution found".to_owned());
+            }
+            if let Ok(default_git) = env::var("WSLGIT_DEFAULT_GIT") {
+                let status;
+                let mut default_git_proc_setup = Command::new(default_git.clone());
+                
+                default_git_proc_setup.args(&args);
+                
+                if enable_logging() {
+                    log(format!("running default git {}", default_git));
+                    log_arguments(&args);
+                }
+                
+                status = default_git_proc_setup
+                    .status()
+                    .expect(&format!("Failed to execute command '{}' {:?}",
+                        &default_git,
+                        args));
+
+                // forward any exit code
+                if let Some(exit_code) = status.code() {
+                    std::process::exit(exit_code);
+                }
+            }
+        }
     }
 
     // build the command arguments that are passed to wsl.exe
@@ -388,11 +422,6 @@ fn main() {
     cmd_args.push(git_cmd.clone());
 
     if enable_logging() {
-        log(format!(
-            "wslgit version {}, current_dir {}",
-            VERSION,
-            env::current_dir().unwrap().to_str().unwrap().to_string()
-        ));
         log_arguments(&cmd_args);
     }
 
