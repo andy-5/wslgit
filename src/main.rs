@@ -386,21 +386,21 @@ fn main() {
             if enable_logging() {
                 log("no distribution found".to_owned());
             }
-            if let Ok(default_git) = env::var("WSLGIT_DEFAULT_GIT") {
+            if let Ok(windows_git) = env::var("WSLGIT_WINDOWS_GIT") {
                 let status;
-                let mut default_git_proc_setup = Command::new(default_git.clone());
+                let mut windows_git_proc_setup = Command::new(windows_git.clone());
                 
-                default_git_proc_setup.args(&args);
+                windows_git_proc_setup.args(&args);
                 
                 if enable_logging() {
-                    log(format!("running default git {}", default_git));
+                    log(format!("running Windows git {}", windows_git));
                     log_arguments(&args);
                 }
                 
-                status = default_git_proc_setup
+                status = windows_git_proc_setup
                     .status()
                     .expect(&format!("Failed to execute command '{}' {:?}",
-                        &default_git,
+                        &windows_git,
                         args));
 
                 // forward any exit code
