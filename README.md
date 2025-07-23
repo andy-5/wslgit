@@ -36,7 +36,7 @@ distributions that you intend to access.
 
 When accessing files on the Windows filesystem or a mapped network drive the 
 default WSL distribution is used unless the
-[`WSLGIT_DEFAULT_DIST`](#wslgit_default_dist) environment variable is set.
+[`WSLGIT_DEFAULT_DIST`](#wslgit_default_dist) environment variable is set. Alternatively, you can set the [`WSLGIT_WINDOWS_GIT`](#wslgit-windows-git) environment variable to completely bypass WSL in these cases instead.
 
 If the default WSL distribution is of WSL2 type then it is highly recommended to
 set the `WSLGIT_DEFAULT_DIST` to the name of a WSL1 instance since WSL1 is both
@@ -133,6 +133,14 @@ WSL distribution to use instead of the WSL default distribution when accessing
 files on the Windows filesystem or from mapped network shares.
 
 > Note, to access files on a mapped network drive a WSL1 distribution must be used.
+
+### WSLGIT_WINDOWS_GIT
+
+To completely bypass WSL for repositories on the Windows filesystem and instead directly run the Windows Git executable, set a Windows environment variable called `WSLGIT_WINDOWS_GIT` to the path of that executable (usually `C:\Program Files\Git\bin\git.exe`). This can be useful (or even required) for several reasons:
+
+* In mixed environments, where some git repositories are located in WSL but others are located on the Windows filesystem, especially when you want separate `.gitconfig` files between WSL and Windows.
+* As an optimization, to skip the overhead of translating to WSL and running git in WSL.
+* This is required when you want to use TortoiseGit both for repositories in WSL and on the Windows filesystem, by pointing the **Git.exe Path** in TortoiseGit settings to `wslgit\bin`. TortoiseGit doesn't support using the WSL Git executable (`usr\bin\git`) for repositories on the Windows filesystem.
 
 ### WSLGIT
 `wslgit` set a variable called `WSLGIT` to `1` and shares it to WSL. This variable can be used in `.bashrc` to 
