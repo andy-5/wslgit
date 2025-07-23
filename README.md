@@ -36,7 +36,7 @@ distributions that you intend to access.
 
 When accessing files on the Windows filesystem or a mapped network drive the 
 default WSL distribution is used unless the
-[`WSLGIT_DEFAULT_DIST`](#wslgit_default_dist) environment variable is set. Alternatively, you can set the [`WSLGIT_WINDOWS_GIT`](#wslgit-windows-git) environment variable to completely bypass WSL in these cases instead.
+[`WSLGIT_DEFAULT_DIST`](#wslgit_default_dist) environment variable is set. Alternatively, you can set the [`WSLGIT_WINDOWS_GIT`](#wslgit_windows_git) environment variable to completely bypass WSL in these cases instead.
 
 If the default WSL distribution is of WSL2 type then it is highly recommended to
 set the `WSLGIT_DEFAULT_DIST` to the name of a WSL1 instance since WSL1 is both
