@@ -4,6 +4,7 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::os::windows::process::CommandExt;
 
 #[macro_use]
 extern crate lazy_static;
@@ -16,6 +17,9 @@ mod wsl;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 const BASH_EXECUTABLE: &str = "/bin/bash";
+
+// https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 static mut DOUBLE_DASH_FOUND: bool = false;
 
@@ -391,6 +395,7 @@ fn main() {
                 let mut windows_git_proc_setup = Command::new(windows_git.clone());
                 
                 windows_git_proc_setup.args(&args);
+                windows_git_proc_setup.creation_flags(CREATE_NO_WINDOW);
                 
                 if enable_logging() {
                     log(format!("running Windows git {}", windows_git));
@@ -429,6 +434,7 @@ fn main() {
 
     // setup the git subprocess launched inside WSL
     let mut git_proc_setup = Command::new("wsl");
+    git_proc_setup.creation_flags(CREATE_NO_WINDOW);
     git_proc_setup.args(&cmd_args);
 
     let status;
