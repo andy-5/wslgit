@@ -160,11 +160,20 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
 }
 
 fn escape_characters(arg: String) -> String {
-    arg.replace("\n", "$'\n'")
+    // First, replace newlines with a temporary placeholder to avoid escaping the $ in $'\n'
+    let temp_newline_placeholder = "___NEWLINE_PLACEHOLDER___";
+    let arg = arg.replace("\n", temp_newline_placeholder);
+    
+    // Now escape other characters including $
+    let arg = arg
+        .replace("$", "\\$")
         .replace("\"", "\\\"")
         .replace("<", "\\<")
         .replace(">", "\\>")
-        .replace("!", "\\!")
+        .replace("!", "\\!");
+    
+    // Finally, replace the placeholder with the bash $'\n' construct
+    arg.replace(temp_newline_placeholder, "$'\n'")
 }
 
 fn invalid_characters(ch: char) -> bool {
@@ -536,6 +545,15 @@ mod tests {
         assert_eq!(
             super::escape_characters("ab\"cd ef\"".to_string()),
             "ab\\\"cd ef\\\""
+        );
+        // Test dollar sign escaping
+        assert_eq!(
+            super::escape_characters("$id.tsx".to_string()),
+            "\\$id.tsx"
+        );
+        assert_eq!(
+            super::escape_characters("file$with$multiple$dollars.txt".to_string()),
+            "file\\$with\\$multiple\\$dollars.txt"
         );
     }
 

@@ -296,4 +296,15 @@ mod integration {
             .success()
             .stdout(predicate::str::contains("/bin/bash"));
     }
+
+    #[test]
+    fn filename_with_dollar_sign() {
+        // Test for files with $ characters like $id.tsx
+        Command::cargo_bin(env!("CARGO_PKG_NAME"))
+            .unwrap()
+            .args(&["status", "--", "$id.tsx"])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .assert()
+            .success();
+    }
 }
