@@ -555,6 +555,15 @@ mod tests {
             super::escape_characters("file$with$multiple$dollars.txt".to_string()),
             "file\\$with\\$multiple\\$dollars.txt"
         );
+        // Test combination of dollar signs and newlines
+        assert_eq!(
+            super::escape_characters("$id\nvalue".to_string()),
+            "\\$id$\'\n\'value"
+        );
+        assert_eq!(
+            super::escape_characters("before$var\nafter$another".to_string()),
+            "before\\$var$\'\n\'after\\$another"
+        );
     }
 
     #[test]
