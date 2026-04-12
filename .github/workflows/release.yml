@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            bash-stub/target
+          key: windows-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build sshgit
+        run: cargo build --release
+
+      - name: Build bash-stub
+        run: cargo build --release --manifest-path bash-stub/Cargo.toml
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          $outDir = "sshgit-$version"
+          New-Item -ItemType Directory $outDir | Out-Null
+
+          Copy-Item target\release\sshgit.exe              "$outDir\sshgit.exe"
+          Copy-Item bash-stub\target\release\bash-stub.exe "$outDir\bash-stub.exe"
+          Copy-Item install.bat                            "$outDir\install.bat"
+
+          Compress-Archive -Path $outDir -DestinationPath "sshgit-$version-windows-x86_64.zip"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sshgit-${{ github.ref_name }}-windows-x86_64.zip

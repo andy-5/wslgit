@@ -1,177 +1,130 @@
-# WSLGit
+# sshgit
 
-This project provides a small executable that forwards all arguments
-to `git` running inside Bash on Windows/Windows Subsystem for Linux (WSL).
+A small Windows executable that transparently forwards git commands to a remote
+host over SSH. Drop it in place of `git.exe` and GUI clients like
+[Fork](https://fork.dev) will route all their git operations to your dev server
+without needing a local git installation.
 
-The primary reason for this tool is to make the Git plugin in
-Visual Studio Code (VSCode) work with the `git` command installed in WSL.
-For these two to interoperate, this tool translates paths
-between the Windows (`C:\Foo\Bar`) and Linux (`/mnt/c/Foo/Bar`)
-representations.
+## How it works
+
+When a git client calls `git <args>`, sshgit:
+
+1. Detects the local repo name by walking up from the current directory to find `.git`, then taking the folder name
+2. Runs `git -C <remote-root>/<repo-name> <args>` on the remote machine over SSH and streams the output back
+
+Open different repos in Fork and sshgit automatically maps each one to its counterpart under the configured root on the remote.
+
+## Getting the files (working tree)
+
+sshgit handles the git protocol side; your GUI client also needs to be able to
+read the actual working tree files. The recommended approach is to mount the
+remote filesystem locally so that the two work together:
+
+### SSHFS mount (recommended)
+
+Install [WinFsp](https://github.com/winfsp/winfsp/releases) and
+[SSHFS-Win](https://github.com/winfsp/sshfs-win/releases), then in Windows
+Explorer map a network drive to:
+
+```
+\\sshfs\<user>@<host>\<path>
+```
+
+For example:
+
+```
+\\sshfs\jake@dev\home\jake
+```
+
+That drive letter (e.g. `Z:\`) gives Fork direct access to the files on the
+remote. Open your repo folder from there as normal.
+
+### WSL (if the host is a local WSL distro)
+
+If `dev` is a local WSL instance the filesystem is already accessible via the
+UNC path — no extra tooling needed:
+
+```
+\\wsl.localhost\Ubuntu\home\jake\myproject
+```
+
+### Clone locally
+
+If you prefer a fully local workflow, clone from the remote as usual and point
+Fork at the local copy. sshgit is not required in this case.
+
+```bash
+git clone jake@dev:/home/jake/myproject
+```
 
 ## Installation
 
-The latest binary release can be downloaded from the
-[releases page](https://github.com/andy-5/wslgit/releases).
+### Prerequisites
 
-**[Optional 1]** Run the `install.bat` script *as administrator*.  
-The `install.bat` script creates a folder structure similar to the one used by `Git For Windows`, 
-and creates some useful symbolic links in the `wslgit\cmd` and `wslgit\bin` folders.
+- [Git for Windows](https://git-scm.com/download/win)
+- [WinFsp](https://github.com/winfsp/winfsp/releases) + [SSHFS-Win](https://github.com/winfsp/sshfs-win/releases) (to mount the remote filesystem)
 
-**[Optional 2]** Add the `wslgit\cmd` directory to your Windows `Path`
-environment variable (user or system).  
-To change the environment variable, type
-`Edit environment variables for your account` into Start menu/Windows search
-and use that tool to edit `Path`.
+### From a release (recommended)
 
-You may also need to install the latest
-[*Microsoft Visual C++ Redistributable for Visual Studio 2017*](https://aka.ms/vs/15/release/vc_redist.x64.exe).
+1. Download the latest `sshgit-vX.X.X-windows-x86_64.zip` from the [releases page](../../releases)
+2. Extract the zip
+3. Run `install.bat`
+4. Enter your SSH host and remote root path when prompted:
 
-## WSL distributions and file systems
+   ```
+   SSH host (e.g. dev or 192.168.1.10): dev
+   Root path on remote where repos live (e.g. /home/jake/Development): /home/jake/Development
+   ```
 
-When accessing files on the filesystem in a WSL distribution using the UNC path
-(`\\wsl$\dist\path` or `\\wsl.localhost\dist\path`) then the distribution used
-is extracted from the path. This means that git must be setup correctly in all
-distributions that you intend to access.
+5. Point your git GUI at:
 
-When accessing files on the Windows filesystem or a mapped network drive the 
-default WSL distribution is used unless the
-[`WSLGIT_DEFAULT_DIST`](#wslgit_default_dist) environment variable is set. Alternatively, you can set the [`WSLGIT_WINDOWS_GIT`](#wslgit_windows_git) environment variable to completely bypass WSL in these cases instead.
+   ```
+   %LOCALAPPDATA%\sshgit\cmd\git.exe
+   ```
 
-If the default WSL distribution is of WSL2 type then it is highly recommended to
-set the `WSLGIT_DEFAULT_DIST` to the name of a WSL1 instance since WSL1 is both
-quicker at accessing the Windows filesystem and can access mapped network drives
-which WSL2 cannot.
+   In Fork: **Preferences → Git → Git executable**
 
-> Tip: use symlinks to map files and folders in all distributions to a common
-> directory to avoid having to maintain multiple copies, for example you can
-> link the `~/.ssh` folder in all WSL dists to the `.ssh` folder in your Windows
-> home folder.
+### From source
 
-## Usage in VSCode
+Requires [Rust](https://www.rust-lang.org). Clone the repo and run the same `install.bat` — it will build automatically if no pre-compiled binaries are found.
 
-VSCode will find the `git` executable automatically if the two optional installation steps were taken.
+## Configuration
 
-If not, set the appropriate path in your VSCode `settings.json`:
+sshgit is configured via a TOML file at
+`~/.config/sshgit/config.toml` (or `%XDG_CONFIG_HOME%/sshgit/config.toml`).
+Environment variables override file values.
 
-```
-{
-    "git.path": "C:\\CHANGE\\TO\\PATH\\TO\\wslgit\\cmd\\wslgit.exe"
-}
-```
+| Key | Env var | Required | Description |
+|-----|---------|----------|-------------|
+| `host` | `SSHGIT_HOST` | Yes | SSH host to connect to |
+| `root` | `SSHGIT_ROOT` | Yes | Root path on the remote where repos live |
+| `port` | — | No | SSH port (default 22) |
+| `identity_file` | — | No | Path to SSH private key |
 
-Also make sure that you use an SSH key without password to access your
-git repositories, or that your SSH key is added to a SSH agent running
-within WSL before starting VSCode.
-*You cannot enter your passphrase in VSCode!*
+### Example
 
-If you use a SSH agent, make sure that it does not print any text
-(like e.g. *Agent pid 123*) during startup of an interactive bash shell.
-If there is any additional output when your bash shell starts, the VSCode
-Git plugin cannot correctly parse the output.
-
-
-## Usage from the command line
-
-If you did the two optional installation steps then 
-you can then just run any git command from a Windows console
-by running `wslgit COMMAND` or `git COMMAND` and it uses the Git version
-installed in WSL.
-
-## Usage in Fork
-
-To make [Fork](https://fork.dev) use `git from WSL` you must have done the first optional installation step (run `install.bat`). Then go to the `Fork` preferences and select a custom git instance where you point it to the `git.exe` in the `wslgit\bin` folder (**not** the *cmd* folder!).
-
-If getting an error message about not being able to execute `Fork.RI` then make
-sure that the `Fork.RI` script is executable inside WSL (run `chmod +x Fork.RI`
-if needed).
-
-## Remarks
-
-Currently, the path translation and shell escaping is very limited,
-just enough to make it work in VSCode.
-
-All absolute paths are translated, but relative paths are only
-translated if they point to existing files or directories.
-Otherwise it would be impossible to detect if an
-argument is a relative path or just some other string.
-VSCode always uses forward slashes for relative paths, so no
-translation is necessary in this case.
-
-Additionally, be careful with special characters interpreted by the shell.
-Only spaces and newlines in arguments are currently handled.
-
-
-## Advanced Usage
-
-### WSLGIT_USE_INTERACTIVE_SHELL
-To automatically support the common case where `ssh-agent` or similar tools are 
-setup by `.bashrc` in interactive mode then, per default, `wslgit` executes `git` 
-inside the WSL environment through `bash` started in interactive mode for some 
-commands (`clone`, `fetch`, `pull` and `push`), and `bash` started in non-interactive 
-mode for all other commands.
-
-The behavior can be selected by setting an environment variable in Windows 
-named `WSLGIT_USE_INTERACTIVE_SHELL` to one of the following values:
-* `false` or `0` - Force `wslgit` to **always** start in **_non_-interactive** mode.
-* `true`, `1`, or empty value - Force `wslgit` to **always** start in **interactive** mode.
-* `smart` (default) - Interactive mode for `clone`, `fetch`, `pull`, `push`, 
-non-interactive mode for all other commands. This is the default if the variable is not set.
-
-Alternatively, if `WSLGIT_USE_INTERACTIVE_SHELL` is **not** set but the Windows 
-environment variable `BASH_ENV` is set to a bash startup script and the environment 
-variable `WSLENV` contains the string `"BASH_ENV"`, then `wslgit` assumes that 
-the forced startup script from `BASH_ENV` contains everything you need, and 
-therefore also starts bash in non-interactive mode.
-
-This feature is only available in Windows 10 builds 17063 and later.
-
-### WSLGIT_DEFAULT_DIST
-
-Set a Windows environment variable called `WSLGIT_DEFAULT_DIST` to the name of a
-WSL distribution to use instead of the WSL default distribution when accessing
-files on the Windows filesystem or from mapped network shares.
-
-> Note, to access files on a mapped network drive a WSL1 distribution must be used.
-
-### WSLGIT_WINDOWS_GIT
-
-To completely bypass WSL for repositories on the Windows filesystem and instead directly run the Windows Git executable, set a Windows environment variable called `WSLGIT_WINDOWS_GIT` to the path of that executable (usually `C:\Program Files\Git\bin\git.exe`). This can be useful (or even required) for several reasons:
-
-* In mixed environments, where some git repositories are located in WSL but others are located on the Windows filesystem, especially when you want separate `.gitconfig` files between WSL and Windows.
-* As an optimization, to skip the overhead of translating to WSL and running git in WSL.
-* This is required when you want to use TortoiseGit both for repositories in WSL and on the Windows filesystem, by pointing the **Git.exe Path** in TortoiseGit settings to `wslgit\bin`. TortoiseGit doesn't support using the WSL Git executable (`usr\bin\git`) for repositories on the Windows filesystem.
-
-### WSLGIT
-`wslgit` set a variable called `WSLGIT` to `1` and shares it to WSL. This variable can be used in `.bashrc` to 
-determine if WSL was invoked by `wslgit`, and for example if set then just do the absolute minimum of initialization 
-needed for `git` to function.  
-Combined with `WSLGIT_USE_INTERACTIVE_SHELL=smart` (default) this can make every git command execute with as little overhead as possible.
-
-This feature is only available in Windows 10 builds 17063 and later.
-
-## Building from source
-
-First, install Rust from https://www.rust-lang.org. Rust on Windows also
-requires Visual Studio or the Visual C++ Build Tools for linking.
-
-The final executable can then be build by running
-
-```
-cargo build --release
+```toml
+host = "dev"
+root = "/home/jake/Development"
 ```
 
-inside the root directory of this project. The resulting binary will
-be located in `./target/release/`.
+If your host doesn't resolve via normal DNS, add an entry to `~/.ssh/config`:
 
-Tests **must** be run using one test thread because of race conditions when changing environment variables:
+```
+Host dev
+    HostName <ip address>
+    User <username>
+```
+
+## Running tests
+
 ```bash
-# Run all tests
+# All tests (single-threaded to avoid env-var races)
 cargo test -- --test-threads=1
-# Run only unit tests
+
+# Unit tests only
 cargo test test -- --test-threads=1
-# Run only integration tests
+
+# Integration tests only
 cargo test integration -- --test-threads=1
-# Run benchmarks (requires nightly toolchain!)
-cargo +nightly bench
 ```
