@@ -5,7 +5,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 fork_ri=resources/Fork.RI
 
 uname() {
-    printf 'Linux test 6.6.0-microsoft-standard-WSL2 x86_64 GNU/Linux\n'
+    printf '%s\n' "${MOCK_UNAME:-Linux test 6.6.0-microsoft-standard-WSL2 x86_64 GNU/Linux}"
 }
 
 cmd.exe() {
@@ -49,6 +49,25 @@ if [[ $status -ne 0 ]]; then
 fi
 if [[ $output != 'editor:C:\repo\git-rebase-todo' ]]; then
     printf 'Unexpected Fork.RI output:\n%s\n' "$output" >&2
+    exit 1
+fi
+
+set +e
+output=$(
+    MOCK_UNAME='Linux test 6.18.38-custom-WSL2 x86_64 GNU/Linux' \
+        WSL_INTEROP=/run/WSL/1_interop \
+        FORK_RI_EXE_PATH=fork_ri_editor \
+        bash "$fork_ri" '/tmp/rebase todo' 2>&1
+)
+status=$?
+set -e
+
+if [[ $status -ne 0 ]]; then
+    printf 'Fork.RI rejected a custom WSL kernel with status %d:\n%s\n' "$status" "$output" >&2
+    exit 1
+fi
+if [[ $output != 'editor:C:\repo\git-rebase-todo' ]]; then
+    printf 'Unexpected custom-kernel Fork.RI output:\n%s\n' "$output" >&2
     exit 1
 fi
 

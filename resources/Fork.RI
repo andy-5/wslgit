@@ -11,7 +11,7 @@ UNAME="$(uname -a)"
 # MINGW32: MINGW32_NT-10.0 PCNAME 2.11.2(0.329/5/3) 2018-11-26 09:22 x86_64 Msys
 # MSYS: MSYS_NT-10.0 PCNAME 2.11.2(0.329/5/3) 2018-11-26 09:22 x86_64 Msys
 
-if [[ $UNAME == *icrosoft* ]]; then
+if [[ -n ${WSL_INTEROP:-} || $UNAME == *icrosoft* ]]; then
     # in a wsl shell
     if ! command -v wslpath >/dev/null 2>&1; then
         exit 1
