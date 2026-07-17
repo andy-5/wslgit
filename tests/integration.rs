@@ -37,8 +37,8 @@ mod integration {
         let _ = std::fs::remove_file(&rotated_log_path);
         std::fs::create_dir_all(&test_dir).unwrap();
 
-        Command::new(&binary)
-            .args(&["-c", &format!("wslgit.test={}", sentinel), "--version"])
+        Command::new(binary.as_os_str())
+            .args(["-c", &format!("wslgit.test={}", sentinel), "--version"])
             .current_dir(&test_dir)
             .env("WSLGIT_ENABLE_LOGGING", "1")
             .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
@@ -66,7 +66,7 @@ mod integration {
         let _ = std::fs::remove_file(&log_path);
         let _ = std::fs::remove_file(&rotated_log_path);
 
-        Command::new(&binary)
+        Command::new(binary.as_os_str())
             .arg("--version")
             .env("WSLGIT_ENABLE_LOGGING", "true")
             .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
@@ -147,7 +147,7 @@ mod integration {
         let mut children = Vec::new();
         for _ in 0..8 {
             children.push(
-                Command::new(&binary)
+                Command::new(binary.as_os_str())
                     .arg("--version")
                     .env("WSLGIT_ENABLE_LOGGING", "1")
                     .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")

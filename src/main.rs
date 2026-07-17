@@ -538,7 +538,7 @@ fn try_acquire_named_mutex(name: &str) -> Option<NamedMutexGuard> {
 }
 
 fn write_bounded_log(logfile: &Path, message: &str, max_bytes: u64) {
-    let record_bytes = message.as_bytes().len().saturating_add(1) as u64;
+    let record_bytes = message.len().saturating_add(1) as u64;
     if record_bytes > max_bytes {
         return;
     }
