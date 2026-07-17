@@ -172,6 +172,8 @@ cargo test -- --test-threads=1
 cargo test test -- --test-threads=1
 # Run only integration tests
 cargo test integration -- --test-threads=1
-# Run benchmarks (requires nightly toolchain!)
-cargo +nightly bench
+# Run benchmarks on stable Rust
+cargo bench --target x86_64-pc-windows-gnu --bench benchmark
+# Override the default 10 measured iterations
+cargo bench --target x86_64-pc-windows-gnu --bench benchmark -- --iterations 25
 ```
