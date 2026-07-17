@@ -11,34 +11,30 @@ UNAME="$(uname -a)"
 # MINGW32: MINGW32_NT-10.0 PCNAME 2.11.2(0.329/5/3) 2018-11-26 09:22 x86_64 Msys
 # MSYS: MSYS_NT-10.0 PCNAME 2.11.2(0.329/5/3) 2018-11-26 09:22 x86_64 Msys
 
-if [[ $UNAME == *icrosoft* ]]; then
+if [[ -n ${WSL_INTEROP:-} || $UNAME == *icrosoft* ]]; then
     # in a wsl shell
-    WSL_BUILD=$(cmd.exe /c "systeminfo" | grep -E -i "build [0-9]+" | sed -E 's/^.*build ([0-9]+).*$/\1/I')
-    if [ -z "$WSL_BUILD" ]; then
-        WSL_BUILD=0
-    fi
-
-    if [ $WSL_BUILD -ge 17046 ] || [ -n "$WSL_INTEROP" ]; then
-        # WSLPATH is available since WSL build 17046
-
-        # Make sure that FORK_RI_EXE_PATH does not contain any badly escaped spaces.
-        # It can happen when using Windows' short paths inside Fork's custom git instance path
-        # Example: Fork is configured with "C:\Users\SURNAM~1\wslgit\bin\git.exe" instead of "C:\Users\Surname Lastname\wslgit\bin\git.exe"
-        # which may be a valid use case as is does not support spaces in paths.
-        # FORK_RI_EXE_PATH would contain "/mnt/c/Users/Surname/ Lastname/wslgit/bin/Fork.RI.exe" before the following sed call
-        FORK_RI_EXE_PATH="$(sed 's/\/ / /g' <<< "$FORK_RI_EXE_PATH")"
-
-        # Make sure that Fork.RI.exe is executable.
-        chmod +x "$FORK_RI_EXE_PATH"
-
-        # Call Fork.RI.exe with the path to the REBASE-TODO converted to a windows path.
-        ARGS=$(wslpath -w "$@")
-        "$FORK_RI_EXE_PATH" "$ARGS"
-        exit $?
-    else
-        # ! No WSLPATH available.
+    if ! command -v wslpath >/dev/null 2>&1; then
         exit 1
     fi
+
+    if [[ -z ${FORK_RI_EXE_PATH:-} ]] || [[ $# -ne 1 ]]; then
+        exit 2
+    fi
+
+    # Make sure that FORK_RI_EXE_PATH does not contain any badly escaped spaces.
+    # It can happen when using Windows' short paths inside Fork's custom git instance path
+    # Example: Fork is configured with "C:\Users\SURNAM~1\wslgit\bin\git.exe" instead of "C:\Users\Surname Lastname\wslgit\bin\git.exe"
+    # which may be a valid use case as is does not support spaces in paths.
+    # FORK_RI_EXE_PATH would contain "/mnt/c/Users/Surname/ Lastname/wslgit/bin/Fork.RI.exe" before the following sed call
+    FORK_RI_EXE_PATH="$(sed 's/\/ / /g' <<< "$FORK_RI_EXE_PATH")"
+
+    # Make sure that Fork.RI.exe is executable.
+    chmod +x "$FORK_RI_EXE_PATH" || exit $?
+
+    # Call Fork.RI.exe with the path to the REBASE-TODO converted to a windows path.
+    ARGS=$(wslpath -w -- "$1") || exit $?
+    "$FORK_RI_EXE_PATH" "$ARGS"
+    exit $?
 else
     # unknown shell
     exit 1
