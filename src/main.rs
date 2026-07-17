@@ -1,11 +1,14 @@
 use std::env;
+use std::ffi::c_void;
+use std::fmt;
 
 use std::fs::OpenOptions;
 use std::io::{self, IsTerminal, Write};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitStatus, Stdio};
 use std::sync::LazyLock;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 #[macro_use]
 extern crate lazy_static;
@@ -19,11 +22,134 @@ mod wsl;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 const BASH_EXECUTABLE: &str = "/bin/bash";
+const MAX_LOG_BYTES: u64 = 1024 * 1024;
+const LOG_MUTEX_NAME: &str = r"Local\wslgit-diagnostic-log-v1";
+const WAIT_OBJECT_0: u32 = 0;
+const WAIT_ABANDONED: u32 = 0x80;
+
+#[link(name = "kernel32")]
+extern "system" {
+    #[link_name = "CreateMutexW"]
+    fn create_mutex_w(
+        mutex_attributes: *mut c_void,
+        initial_owner: i32,
+        name: *const u16,
+    ) -> *mut c_void;
+    #[link_name = "WaitForSingleObject"]
+    fn wait_for_single_object(handle: *mut c_void, milliseconds: u32) -> u32;
+    #[link_name = "ReleaseMutex"]
+    fn release_mutex(handle: *mut c_void) -> i32;
+    #[link_name = "CloseHandle"]
+    fn close_handle(handle: *mut c_void) -> i32;
+}
 
 // https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 static mut DOUBLE_DASH_FOUND: bool = false;
+
+#[derive(Clone, Copy)]
+enum LogTarget {
+    WindowsGit,
+    Wsl,
+}
+
+#[derive(Clone, Copy)]
+enum LogOperation {
+    Run,
+    Start,
+    Wait,
+}
+
+impl fmt::Display for LogOperation {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let value = match self {
+            LogOperation::Run => "run",
+            LogOperation::Start => "start",
+            LogOperation::Wait => "wait",
+        };
+        write!(formatter, "{}", value)
+    }
+}
+
+impl fmt::Display for LogTarget {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let value = match self {
+            LogTarget::WindowsGit => "windows_git",
+            LogTarget::Wsl => "wsl",
+        };
+        write!(formatter, "{}", value)
+    }
+}
+
+enum LogEvent {
+    Arguments {
+        input_count: usize,
+        forwarded_count: usize,
+    },
+    Complete {
+        target: LogTarget,
+        exit_status: Option<i32>,
+        elapsed_ms: u128,
+    },
+    Dispatch {
+        target: LogTarget,
+    },
+    NoDistribution,
+    PathTranslation,
+    ProcessError {
+        target: LogTarget,
+        operation: LogOperation,
+        error_kind: io::ErrorKind,
+        elapsed_ms: u128,
+    },
+    Start,
+}
+
+impl fmt::Display for LogEvent {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LogEvent::Arguments {
+                input_count,
+                forwarded_count,
+            } => write!(
+                formatter,
+                "event=arguments input_count={} forwarded_count={}",
+                input_count, forwarded_count
+            ),
+            LogEvent::Complete {
+                target,
+                exit_status,
+                elapsed_ms,
+            } => {
+                let exit_status = exit_status
+                    .map(|code| code.to_string())
+                    .unwrap_or_else(|| "unavailable".to_string());
+                write!(
+                    formatter,
+                    "event=complete target={} exit_status={} elapsed_ms={}",
+                    target, exit_status, elapsed_ms
+                )
+            }
+            LogEvent::Dispatch { target } => {
+                write!(formatter, "event=dispatch target={}", target)
+            }
+            LogEvent::NoDistribution => write!(formatter, "event=no_distribution"),
+            LogEvent::PathTranslation => write!(formatter, "event=path_translation"),
+            LogEvent::ProcessError {
+                target,
+                operation,
+                error_kind,
+                elapsed_ms,
+            } => write!(
+                formatter,
+                "event=process_error target={} operation={} error_kind={:?} elapsed_ms={}",
+                target, operation, error_kind, elapsed_ms
+            ),
+            LogEvent::Start => write!(formatter, "event=start version={}", VERSION),
+        }
+    }
+}
 
 fn translate_path_to_unix(argument: String) -> String {
     let argument = argument.as_bytes();
@@ -153,12 +279,7 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
             .output()
             .expect("failed to execute echo_cmd");
         if enable_logging() {
-            log(format!(
-                "{:?} -> {} -> {:?}",
-                line,
-                echo_cmd,
-                std::str::from_utf8(&output.stdout).unwrap()
-            ));
+            log(LogEvent::PathTranslation);
         }
         return output.stdout;
     }
@@ -363,40 +484,165 @@ fn enable_logging() -> bool {
     false
 }
 
-fn log_arguments(out_args: &Vec<String>) {
-    let in_args = env::args().collect::<Vec<String>>();
-    log(format!("{:?} -> {:?}", in_args, out_args));
+fn log_arguments(out_args: &[String]) {
+    log(LogEvent::Arguments {
+        input_count: env::args().skip(1).count(),
+        forwarded_count: out_args.len(),
+    });
 }
 
-fn log(message: String) {
-    let logfile = match env::current_exe() {
-        Ok(exe_path) => exe_path
-            .parent()
-            .unwrap()
-            .join("wslgit.log")
-            .to_string_lossy()
-            .into_owned(),
-        Err(e) => {
-            eprintln!("Failed to get current exe path: {}", e);
-            Path::new("wslgit.log").to_string_lossy().into_owned()
+fn write_log_record<F>(open_log: F, message: &str)
+where
+    F: FnOnce() -> io::Result<Box<dyn Write>>,
+{
+    if let Ok(mut log_file) = open_log() {
+        let mut record = Vec::with_capacity(message.len().saturating_add(1));
+        record.extend_from_slice(message.as_bytes());
+        record.push(b'\n');
+        let _ = log_file.write_all(&record);
+    }
+}
+
+struct NamedMutexGuard {
+    handle: *mut c_void,
+}
+
+impl Drop for NamedMutexGuard {
+    fn drop(&mut self) {
+        unsafe {
+            release_mutex(self.handle);
+            close_handle(self.handle);
         }
+    }
+}
+
+fn try_acquire_named_mutex(name: &str) -> Option<NamedMutexGuard> {
+    let wide_name = name
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+    let handle = unsafe { create_mutex_w(std::ptr::null_mut(), 0, wide_name.as_ptr()) };
+    if handle.is_null() {
+        return None;
+    }
+
+    let wait_status = unsafe { wait_for_single_object(handle, 0) };
+    if wait_status == WAIT_OBJECT_0 || wait_status == WAIT_ABANDONED {
+        Some(NamedMutexGuard { handle })
+    } else {
+        unsafe {
+            close_handle(handle);
+        }
+        None
+    }
+}
+
+fn write_bounded_log(logfile: &Path, message: &str, max_bytes: u64) {
+    let record_bytes = message.as_bytes().len().saturating_add(1) as u64;
+    if record_bytes > max_bytes {
+        return;
+    }
+
+    let mut rotated_path = logfile.as_os_str().to_os_string();
+    rotated_path.push(".1");
+    let rotated_path = PathBuf::from(rotated_path);
+
+    match std::fs::metadata(logfile) {
+        Ok(metadata) if metadata.len() > max_bytes => {
+            match std::fs::remove_file(&rotated_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(_) => return,
+            }
+            if std::fs::remove_file(logfile).is_err() {
+                return;
+            }
+        }
+        Ok(metadata) if metadata.len().saturating_add(record_bytes) > max_bytes => {
+            match std::fs::remove_file(&rotated_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(_) => return,
+            }
+            if std::fs::rename(logfile, rotated_path).is_err() {
+                return;
+            }
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(_) => return,
+    }
+
+    write_log_record(
+        || {
+            OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(logfile)
+                .map(|file| Box::new(file) as Box<dyn Write>)
+        },
+        message,
+    );
+}
+
+fn log(event: LogEvent) {
+    let logfile = match env::current_exe()
+        .ok()
+        .and_then(|exe_path| exe_path.parent().map(|parent| parent.join("wslgit.log")))
+    {
+        Some(logfile) => logfile,
+        None => return,
     };
 
-    let f = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(logfile)
-        .unwrap();
-    write!(&f, "{}\n", message).unwrap();
+    let timestamp_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let record = format!(
+        "timestamp_ms={} pid={} {}",
+        timestamp_ms,
+        std::process::id(),
+        event
+    );
+
+    let _log_guard = match try_acquire_named_mutex(LOG_MUTEX_NAME) {
+        Some(guard) => guard,
+        None => return,
+    };
+    write_bounded_log(&logfile, &record, MAX_LOG_BYTES);
+}
+
+fn log_completion(target: LogTarget, status: &ExitStatus, started_at: &Instant) {
+    if enable_logging() {
+        log(LogEvent::Complete {
+            target,
+            exit_status: status.code(),
+            elapsed_ms: started_at.elapsed().as_millis(),
+        });
+    }
+}
+
+fn log_process_error(
+    target: LogTarget,
+    operation: LogOperation,
+    error: &io::Error,
+    started_at: &Instant,
+) {
+    if enable_logging() {
+        log(LogEvent::ProcessError {
+            target,
+            operation,
+            error_kind: error.kind(),
+            elapsed_ms: started_at.elapsed().as_millis(),
+        });
+    }
 }
 
 fn main() {
+    let started_at = Instant::now();
+
     if enable_logging() {
-        log(format!(
-            "wslgit version {}, current_dir {}",
-            VERSION,
-            env::current_dir().unwrap().to_str().unwrap().to_string()
-        ));
+        log(LogEvent::Start);
     }
 
     let have_terminal = {
@@ -421,7 +667,7 @@ fn main() {
         }
         None => {
             if enable_logging() {
-                log("no distribution found".to_owned());
+                log(LogEvent::NoDistribution);
             }
             if let Ok(windows_git) = env::var("WSLGIT_WINDOWS_GIT") {
                 let status;
@@ -433,14 +679,26 @@ fn main() {
                 }
 
                 if enable_logging() {
-                    log(format!("running Windows git {}", windows_git));
+                    log(LogEvent::Dispatch {
+                        target: LogTarget::WindowsGit,
+                    });
                     log_arguments(&args);
                 }
 
-                status = windows_git_proc_setup.status().expect(&format!(
-                    "Failed to execute command '{}' {:?}",
-                    &windows_git, args
-                ));
+                status = windows_git_proc_setup.status().unwrap_or_else(|error| {
+                    log_process_error(
+                        LogTarget::WindowsGit,
+                        LogOperation::Run,
+                        &error,
+                        &started_at,
+                    );
+                    panic!(
+                        "Failed to execute command '{}' {:?}: {}",
+                        &windows_git, args, error
+                    )
+                });
+
+                log_completion(LogTarget::WindowsGit, &status, &started_at);
 
                 // forward any exit code
                 if let Some(exit_code) = status.code() {
@@ -461,6 +719,9 @@ fn main() {
     cmd_args.push(git_cmd.clone());
 
     if enable_logging() {
+        log(LogEvent::Dispatch {
+            target: LogTarget::Wsl,
+        });
         log_arguments(&cmd_args);
     }
 
@@ -493,10 +754,14 @@ fn main() {
         let git_proc = git_proc_setup
             .stdout(Stdio::piped())
             .spawn()
-            .expect(&format!("Failed to execute command '{}'", &git_cmd));
-        let output = git_proc
-            .wait_with_output()
-            .expect(&format!("Failed to wait for git call '{}'", &git_cmd));
+            .unwrap_or_else(|error| {
+                log_process_error(LogTarget::Wsl, LogOperation::Start, &error, &started_at);
+                panic!("Failed to execute command '{}': {}", &git_cmd, error)
+            });
+        let output = git_proc.wait_with_output().unwrap_or_else(|error| {
+            log_process_error(LogTarget::Wsl, LogOperation::Wait, &error, &started_at);
+            panic!("Failed to wait for git call '{}': {}", &git_cmd, error)
+        });
         status = output.status;
         let output_bytes = output.stdout;
         let mut stdout = io::stdout();
@@ -507,10 +772,13 @@ fn main() {
     } else {
         // run the subprocess without capturing its output
         // the output of the subprocess is passed through unchanged
-        status = git_proc_setup
-            .status()
-            .expect(&format!("Failed to execute command '{}'", &git_cmd));
+        status = git_proc_setup.status().unwrap_or_else(|error| {
+            log_process_error(LogTarget::Wsl, LogOperation::Run, &error, &started_at);
+            panic!("Failed to execute command '{}': {}", &git_cmd, error)
+        });
     }
+
+    log_completion(LogTarget::Wsl, &status, &started_at);
 
     // forward any exit code
     if let Some(exit_code) = status.code() {
@@ -521,6 +789,151 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn log_open_failures_are_ignored() {
+        write_log_record(
+            || Err(io::Error::new(io::ErrorKind::PermissionDenied, "denied")),
+            "event=test",
+        );
+    }
+
+    #[test]
+    fn log_write_failures_are_ignored() {
+        struct FailingWriter;
+
+        impl Write for FailingWriter {
+            fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+                Err(io::Error::new(io::ErrorKind::WriteZero, "write failed"))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        write_log_record(|| Ok(Box::new(FailingWriter)), "event=test");
+    }
+
+    #[test]
+    fn log_record_is_written_with_one_write_call() {
+        use std::sync::{Arc, Mutex};
+
+        struct RecordingWriter {
+            writes: Arc<Mutex<Vec<Vec<u8>>>>,
+        }
+
+        impl Write for RecordingWriter {
+            fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+                self.writes.lock().unwrap().push(buffer.to_vec());
+                Ok(buffer.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let writes = Arc::new(Mutex::new(Vec::new()));
+        let writer_writes = Arc::clone(&writes);
+        write_log_record(
+            move || {
+                Ok(Box::new(RecordingWriter {
+                    writes: writer_writes,
+                }))
+            },
+            "event=test",
+        );
+
+        assert_eq!(*writes.lock().unwrap(), vec![b"event=test\n".to_vec()]);
+    }
+
+    #[test]
+    fn log_mutex_is_nonblocking_between_threads() {
+        let mutex_name = format!(
+            r"Local\wslgit-log-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let guard = try_acquire_named_mutex(&mutex_name).expect("failed to acquire test mutex");
+
+        let contended_name = mutex_name.clone();
+        let contended =
+            std::thread::spawn(move || try_acquire_named_mutex(&contended_name).is_none())
+                .join()
+                .unwrap();
+        assert!(contended);
+
+        drop(guard);
+        let acquired = std::thread::spawn(move || try_acquire_named_mutex(&mutex_name).is_some())
+            .join()
+            .unwrap();
+        assert!(acquired);
+    }
+
+    #[test]
+    fn process_error_event_contains_only_controlled_metadata() {
+        assert_eq!(
+            LogEvent::ProcessError {
+                target: LogTarget::Wsl,
+                operation: LogOperation::Start,
+                error_kind: io::ErrorKind::NotFound,
+                elapsed_ms: 12,
+            }
+            .to_string(),
+            "event=process_error target=wsl operation=start error_kind=NotFound elapsed_ms=12"
+        );
+    }
+
+    #[test]
+    fn log_rotates_before_exceeding_the_size_limit() {
+        let test_dir = env::temp_dir().join(format!(
+            "wslgit-log-rotation-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&test_dir).unwrap();
+        let log_path = test_dir.join("wslgit.log");
+        std::fs::write(&log_path, b"12345678").unwrap();
+
+        write_bounded_log(&log_path, "abcd", 10);
+
+        assert_eq!(std::fs::read(&log_path).unwrap(), b"abcd\n");
+        assert_eq!(
+            std::fs::read(test_dir.join("wslgit.log.1")).unwrap(),
+            b"12345678"
+        );
+        assert!(std::fs::metadata(&log_path).unwrap().len() <= 10);
+        std::fs::remove_dir_all(test_dir).unwrap();
+    }
+
+    #[test]
+    fn log_discards_an_existing_file_that_already_exceeds_the_limit() {
+        let test_dir = env::temp_dir().join(format!(
+            "wslgit-log-oversize-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&test_dir).unwrap();
+        let log_path = test_dir.join("wslgit.log");
+        std::fs::write(&log_path, b"123456789012").unwrap();
+
+        write_bounded_log(&log_path, "abcd", 10);
+
+        assert_eq!(std::fs::read(&log_path).unwrap(), b"abcd\n");
+        let rotated_log_path = test_dir.join("wslgit.log.1");
+        assert!(!rotated_log_path.exists());
+        std::fs::remove_dir_all(test_dir).unwrap();
+    }
 
     #[test]
     fn use_interactive_shell_test() {
