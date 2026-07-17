@@ -111,7 +111,101 @@ fn translate_path_to_unix(argument: String) -> String {
     std::str::from_utf8(&argument).unwrap().to_string()
 }
 
-fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
+fn translate_unix_path_direct(
+    path: &[u8],
+    wsl_unc_prefix: Option<&[u8]>,
+    windows_drive: Option<u8>,
+) -> Option<Vec<u8>> {
+    if path.starts_with(b"/mnt/")
+        && path.len() >= b"/mnt/c".len()
+        && path[b"/mnt/".len()].is_ascii_alphabetic()
+        && (path.len() == b"/mnt/c".len() || path[b"/mnt/c".len()] == b'/')
+    {
+        let path_drive = path[b"/mnt/".len()].to_ascii_uppercase();
+        if windows_drive.map(|drive| drive.to_ascii_uppercase()) != Some(path_drive) {
+            return None;
+        }
+        let mut translated = Vec::with_capacity(path.len() - b"/mnt/c".len() + 3);
+        translated.push(path_drive);
+        translated.extend_from_slice(b":\\");
+        for byte in path.iter().skip(b"/mnt/c/".len()) {
+            translated.push(if *byte == b'/' { b'\\' } else { *byte });
+        }
+        return Some(translated);
+    }
+
+    let wsl_unc_prefix = wsl_unc_prefix?;
+    let mut translated = Vec::with_capacity(path.len() + wsl_unc_prefix.len());
+    translated.extend_from_slice(wsl_unc_prefix);
+    for byte in path {
+        translated.push(if *byte == b'/' { b'\\' } else { *byte });
+    }
+    Some(translated)
+}
+
+fn translate_path_to_win_direct(
+    line: &[u8],
+    wsl_unc_prefix: Option<&[u8]>,
+    windows_drive: Option<u8>,
+) -> Option<Vec<u8>> {
+    lazy_static! {
+        static ref WSLPATH_RE: Regex =
+            Regex::new(r"(?m)(?-u)(?P<pre>^|[[:space:]])(?P<path>/([^<>:|?'*\n]*/?)*)")
+                .expect("Failed to compile WSLPATH_RE regex");
+    }
+
+    let mut translated = Vec::with_capacity(line.len());
+    let mut previous_end = 0;
+
+    for captures in WSLPATH_RE.captures_iter(line) {
+        let path_match = captures.name("path").unwrap();
+        let mut path = path_match.as_bytes();
+        let remote_suffix = if path.ends_with(b" (fetch)") {
+            path = &path[..path.len() - b" (fetch)".len()];
+            &b" (fetch)"[..]
+        } else if path.ends_with(b" (push)") {
+            path = &path[..path.len() - b" (push)".len()];
+            &b" (push)"[..]
+        } else {
+            &b""[..]
+        };
+
+        translated.extend_from_slice(&line[previous_end..path_match.start()]);
+        translated.extend_from_slice(&translate_unix_path_direct(
+            path,
+            wsl_unc_prefix,
+            windows_drive,
+        )?);
+        translated.extend_from_slice(remote_suffix);
+        previous_end = path_match.end();
+    }
+
+    translated.extend_from_slice(&line[previous_end..]);
+    Some(translated)
+}
+
+fn wsl_path_translation_command(wsl_dist: Option<&str>) -> Command {
+    let mut command = Command::new("wsl");
+    if let Some(wsl_dist) = wsl_dist {
+        command.arg("--distribution").arg(wsl_dist);
+    }
+    command.arg("-e").arg(BASH_EXECUTABLE).arg("-c");
+    command
+}
+
+fn translate_path_to_win(
+    line: &[u8],
+    wsl_unc_prefix: Option<&[u8]>,
+    windows_drive: Option<u8>,
+    wsl_dist: Option<&str>,
+) -> Vec<u8> {
+    if let Some(translated) = translate_path_to_win_direct(line, wsl_unc_prefix, windows_drive) {
+        return translated;
+    }
+    if std::str::from_utf8(line).is_err() {
+        return line.to_vec();
+    }
+
     // Windows can handle both / and \ as path separator so there is no need to convert relative paths.
 
     // An absolute Unix path must:
@@ -145,10 +239,7 @@ fn translate_path_to_win(line: &[u8]) -> Vec<u8> {
         let line = std::str::from_utf8(&line).unwrap();
 
         let echo_cmd = format!("echo -n \"{}\"", line);
-        let output = Command::new("wsl")
-            .arg("-e")
-            .arg(BASH_EXECUTABLE)
-            .arg("-c")
+        let output = wsl_path_translation_command(wsl_dist)
             .arg(&echo_cmd)
             .output()
             .expect("failed to execute echo_cmd");
@@ -354,6 +445,37 @@ fn get_wsl_dist_name(path: &str) -> Option<String> {
     return wsl_dist_name;
 }
 
+fn get_wsl_unc_prefix(path: &str) -> Option<String> {
+    const UNC_SERVER_WSL: &str = "\\\\wsl$\\";
+    const UNC_SERVER_WSL_LOCALHOST: &str = "\\\\wsl.localhost\\";
+
+    let (server, path_without_server) = if let Some(path) = path.strip_prefix(UNC_SERVER_WSL) {
+        (UNC_SERVER_WSL, path)
+    } else {
+        let path = path.strip_prefix(UNC_SERVER_WSL_LOCALHOST)?;
+        (UNC_SERVER_WSL_LOCALHOST, path)
+    };
+
+    let (dist_name, _) = path_without_server.split_once('\\')?;
+    if dist_name.is_empty() {
+        return None;
+    }
+    Some(format!("{}{}", server, dist_name))
+}
+
+fn get_windows_drive_letter(path: &str) -> Option<u8> {
+    let bytes = path.as_bytes();
+    if bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'\\' || bytes[2] == b'/')
+    {
+        Some(bytes[0].to_ascii_uppercase())
+    } else {
+        None
+    }
+}
+
 fn enable_logging() -> bool {
     if let Ok(enable_log_flag) = env::var("WSLGIT_ENABLE_LOGGING") {
         if enable_log_flag == "true" || enable_log_flag == "1" {
@@ -414,7 +536,10 @@ fn main() {
     // Assumes that the first element in args is the executable
     let args: Vec<String> = env::args().skip(1).collect();
     let working_directory = get_working_directory(curr_dir, &args);
-    match get_wsl_dist_name(&working_directory) {
+    let wsl_dist = get_wsl_dist_name(&working_directory);
+    let wsl_unc_prefix = get_wsl_unc_prefix(&working_directory);
+    let windows_drive = get_windows_drive_letter(&working_directory);
+    match wsl_dist.as_ref() {
         Some(wsl_dist) => {
             cmd_args.push("--distribution".to_string());
             cmd_args.push(wsl_dist.to_string());
@@ -501,7 +626,12 @@ fn main() {
         let output_bytes = output.stdout;
         let mut stdout = io::stdout();
         stdout
-            .write_all(&translate_path_to_win(&output_bytes))
+            .write_all(&translate_path_to_win(
+                &output_bytes,
+                wsl_unc_prefix.as_deref().map(str::as_bytes),
+                windows_drive,
+                wsl_dist.as_deref(),
+            ))
             .expect("Failed to write git output");
         stdout.flush().expect("Failed to flush output");
     } else {
@@ -733,6 +863,76 @@ mod tests {
     }
 
     #[test]
+    fn selected_distribution_translates_output_without_wsl() {
+        let output = b"first /home/\xff/repo\nsecond /tmp/other (fetch)\nraw \xfe\n";
+
+        assert_eq!(
+            translate_path_to_win_direct(
+                output,
+                Some(b"\\\\wsl.localhost\\Test-Distro"),
+                None
+            ),
+            Some(
+                b"first \\\\wsl.localhost\\Test-Distro\\home\\\xff\\repo\nsecond \\\\wsl.localhost\\Test-Distro\\tmp\\other (fetch)\nraw \xfe\n"
+                    .to_vec()
+            )
+        );
+    }
+
+    #[test]
+    fn mounted_drive_translates_output_without_wsl() {
+        assert_eq!(
+            translate_path_to_win_direct(b"/mnt/c/work/repo\n", None, Some(b'C')),
+            Some(b"C:\\work\\repo\n".to_vec())
+        );
+    }
+
+    #[test]
+    fn unproven_mounted_drive_uses_fallback() {
+        assert_eq!(
+            translate_path_to_win_direct(b"/mnt/z/work/repo\n", None, None),
+            None
+        );
+    }
+
+    #[test]
+    fn output_translation_uses_direct_path_for_unc_worktree() {
+        assert_eq!(
+            translate_path_to_win(
+                b"/home/repo\n",
+                Some(b"\\\\wsl.localhost\\No-Such-Distro"),
+                None,
+                Some("No-Such-Distro")
+            ),
+            b"\\\\wsl.localhost\\No-Such-Distro\\home\\repo\n".to_vec()
+        );
+    }
+
+    #[test]
+    fn unsupported_non_utf8_output_is_preserved() {
+        let output = b"/home/\xff/repo\n";
+
+        assert_eq!(
+            translate_path_to_win(output, None, None, None),
+            output.to_vec()
+        );
+    }
+
+    #[test]
+    fn path_translation_fallback_uses_selected_distribution() {
+        let command = wsl_path_translation_command(Some("Test-Distro"));
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+
+        assert_eq!(
+            args,
+            vec!["--distribution", "Test-Distro", "-e", "/bin/bash", "-c"]
+        );
+    }
+
+    #[test]
     fn unix_to_win_path_trans() {
         let check_wslpath = Command::new("wsl")
             .arg("-e")
@@ -740,7 +940,7 @@ mod tests {
             .arg("-c")
             .arg("wslpath C:\\")
             .output();
-        let prefix_bytes = translate_path_to_win(b"/");
+        let prefix_bytes = translate_path_to_win(b"/", None, None, None);
         let prefix = std::str::from_utf8(&prefix_bytes).unwrap();
         if check_wslpath.is_err()
             || !check_wslpath.expect("bash output").status.success()
@@ -763,18 +963,33 @@ mod tests {
             .output()
             .expect("creating tmp test file");
         assert_eq!(
-            std::str::from_utf8(&translate_path_to_win(b"/tmp/wslgit test file")).unwrap(),
+            std::str::from_utf8(&translate_path_to_win(
+                b"/tmp/wslgit test file",
+                None,
+                None,
+                None,
+            ))
+            .unwrap(),
             format!("{}tmp\\wslgit test file", prefix)
         );
         assert_eq!(
             std::str::from_utf8(&translate_path_to_win(
-                b"origin  /tmp/wslgit test file (fetch)"
+                b"origin  /tmp/wslgit test file (fetch)",
+                None,
+                None,
+                None
             ))
             .unwrap(),
             format!("origin  {}tmp\\wslgit test file (fetch)", prefix)
         );
         assert_eq!(
-            std::str::from_utf8(&translate_path_to_win(b"mirror  /tmp/wslgit test file (fetch)\nmirror  /tmp/wslgit test file (push)\n")).unwrap(),
+            std::str::from_utf8(&translate_path_to_win(
+                b"mirror  /tmp/wslgit test file (fetch)\nmirror  /tmp/wslgit test file (push)\n",
+                None,
+                None,
+                None,
+            ))
+            .unwrap(),
             format!("mirror  {0}tmp\\wslgit test file (fetch)\nmirror  {0}tmp\\wslgit test file (push)\n", prefix)
         );
         Command::new("wsl")
@@ -1084,6 +1299,29 @@ mod tests {
             None
         );
         assert_eq!(get_wsl_dist_name(&r"C:\a\b\c".to_string()), None);
+    }
+
+    #[test]
+    fn wsl_unc_prefix_preserves_server_style() {
+        assert_eq!(
+            get_wsl_unc_prefix(r"\\wsl$\dist-name\a\b\c"),
+            Some(r"\\wsl$\dist-name".to_string())
+        );
+        assert_eq!(
+            get_wsl_unc_prefix(r"\\wsl.localhost\dist-name\a\b\c"),
+            Some(r"\\wsl.localhost\dist-name".to_string())
+        );
+        assert_eq!(get_wsl_unc_prefix(r"C:\a\b\c"), None);
+    }
+
+    #[test]
+    fn windows_drive_letter_comes_from_working_directory() {
+        assert_eq!(get_windows_drive_letter(r"C:\work\repo"), Some(b'C'));
+        assert_eq!(get_windows_drive_letter(r"d:/work/repo"), Some(b'D'));
+        assert_eq!(
+            get_windows_drive_letter(r"\\wsl.localhost\Ubuntu\home\repo"),
+            None
+        );
     }
 
     #[test]
