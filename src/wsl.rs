@@ -1,5 +1,35 @@
 use std::env;
 
+fn share_key(key: &str, translate_path: bool) {
+    let wslenv_key = if translate_path {
+        format!("{}/p", key)
+    } else {
+        key.to_owned()
+    };
+
+    let original_wslenv = env::var("WSLENV").unwrap_or_default();
+    let mut entries = Vec::new();
+    let mut key_added = false;
+
+    for entry in original_wslenv.split(':').filter(|entry| !entry.is_empty()) {
+        let entry_key = entry.split('/').next().unwrap();
+        if entry_key.eq_ignore_ascii_case(key) {
+            if !key_added {
+                entries.push(wslenv_key.clone());
+                key_added = true;
+            }
+        } else {
+            entries.push(entry.to_owned());
+        }
+    }
+
+    if !key_added {
+        entries.push(wslenv_key);
+    }
+
+    env::set_var("WSLENV", entries.join(":"));
+}
+
 /// Share a value to WSL by using an environment variable and `WSLENV`.
 ///
 /// * `key` - Name to use for the environment variable.
@@ -7,36 +37,14 @@ use std::env;
 /// * `translate_path` - If `true` will append `/p` to the variable name when added to `WSLENV`.
 pub fn share_val(key: &str, value: &str, translate_path: bool) {
     env::set_var(key, value);
+    share_key(key, translate_path);
+}
 
-    let wslenv_key = if translate_path {
-        format!("{}/p", key)
-    } else {
-        key.to_owned()
-    };
-
-    let wslenv = match env::var("WSLENV") {
-        Ok(original_wslenv) => {
-            // WSLENV exists, add new variable only once
-            let re: regex::Regex =
-                regex::Regex::new(format!(r"(^|:){}(/|:|$)", wslenv_key).as_str())
-                    .expect("Failed to compile regex");
-
-            if original_wslenv.is_empty() {
-                format!("{}", wslenv_key)
-            } else if re.is_match(original_wslenv.as_str()) == false {
-                format!("{}:{}", original_wslenv, wslenv_key)
-            } else {
-                // Don't add anything to WSLENV
-                original_wslenv
-            }
-        }
-        Err(_e) => {
-            // No WSLENV
-            format!("{}", wslenv_key)
-        }
-    };
-
-    env::set_var("WSLENV", wslenv);
+/// Share an existing environment variable with WSL when it is present.
+pub fn share_env(key: &str, translate_path: bool) {
+    if env::var_os(key).is_some() {
+        share_key(key, translate_path);
+    }
 }
 
 #[cfg(test)]
@@ -75,9 +83,6 @@ mod tests {
         env::set_var("WSLENV", "VAR1:VAR2:VAR3:VAR4:VAR5");
         share_val("VAR5", "5", true);
         assert_eq!("5", env::var("VAR5").unwrap());
-        assert_eq!(
-            "VAR1:VAR2:VAR3:VAR4:VAR5:VAR5/p",
-            env::var("WSLENV").unwrap()
-        );
+        assert_eq!("VAR1:VAR2:VAR3:VAR4:VAR5/p", env::var("WSLENV").unwrap());
     }
 }

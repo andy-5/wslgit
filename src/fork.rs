@@ -9,6 +9,20 @@ pub fn needs_patching() -> bool {
         .is_some()
 }
 
+/// Share the environment Fork uses for Git credential prompts with WSL.
+pub fn share_environment() {
+    if !needs_patching() {
+        return;
+    }
+
+    for key in &["FORK_PROCESS_ID", "SSH_ASKPASS_REQUIRE", "NO_PROMPT"] {
+        wsl::share_env(key, false);
+    }
+    for key in &["FORK_REPOSITORY_PATH", "SSH_ASKPASS"] {
+        wsl::share_env(key, true);
+    }
+}
+
 /// Patches the argument for Fork's interactive-rebase GUI.
 ///
 /// If the argument is an editor and the editor is `Fork.RI.exe` then replace the
