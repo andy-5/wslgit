@@ -266,6 +266,35 @@ mod integration {
     }
 
     #[test]
+    fn fork_askpass_environment_is_forwarded_to_wsl() {
+        Command::new(cargo_bin!(env!("CARGO_PKG_NAME")))
+            .args(&[
+                "log",
+                "-1",
+                "--pretty=format:$(printenv FORK_PROCESS_ID FORK_REPOSITORY_PATH SSH_ASKPASS SSH_ASKPASS_REQUIRE NO_PROMPT WSLENV)",
+            ])
+            .env("WSLGIT_USE_INTERACTIVE_SHELL", "false")
+            .env("WSLENV", "EXISTING:SSH_ASKPASS")
+            .env("EXISTING", "preserved")
+            .env("FORK_PROCESS_ID", "fork-process")
+            .env("FORK_REPOSITORY_PATH", r"C:\fork repo")
+            .env("SSH_ASKPASS", r"C:\Fork\askpass.exe")
+            .env("SSH_ASKPASS_REQUIRE", "force")
+            .env("NO_PROMPT", "1")
+            .assert()
+            .success()
+            .stdout(concat!(
+                "fork-process\n",
+                "/mnt/c/fork repo\n",
+                "/mnt/c/Fork/askpass.exe\n",
+                "force\n",
+                "1\n",
+                "EXISTING:SSH_ASKPASS/p:FORK_PROCESS_ID:SSH_ASKPASS_REQUIRE:",
+                "NO_PROMPT:FORK_REPOSITORY_PATH/p:WSLGIT",
+            ));
+    }
+
+    #[test]
     fn shell_environment_variable() {
         Command::new(cargo_bin!(env!("CARGO_PKG_NAME")))
             // Use pretty format to call 'printenv SHELL'

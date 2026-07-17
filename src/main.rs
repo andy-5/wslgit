@@ -464,6 +464,7 @@ fn main() {
         log_arguments(&cmd_args);
     }
 
+    fork::share_environment();
     wsl::share_val("WSLGIT", "1", false);
 
     // setup the git subprocess launched inside WSL
