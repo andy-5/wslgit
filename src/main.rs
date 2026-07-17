@@ -791,6 +791,14 @@ mod tests {
         unsafe {
             DOUBLE_DASH_FOUND = false;
         }
+        let checkout_name = env::current_dir()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let relative_windows_path = format!("..\\{}\\src\\main.rs", checkout_name);
+        let relative_unix_path = format!("../{}/src/main.rs", checkout_name);
 
         assert_eq!(
             translate_path_to_unix("src\\main.rs".to_string()),
@@ -809,17 +817,17 @@ mod tests {
             "./src/main.rs"
         );
         assert_eq!(
-            translate_path_to_unix("..\\wslgit\\src\\main.rs".to_string()),
-            "../wslgit/src/main.rs"
+            translate_path_to_unix(relative_windows_path.clone()),
+            relative_unix_path
         );
         assert_eq!(
-            translate_path_to_unix("../wslgit/src/main.rs".to_string()),
-            "../wslgit/src/main.rs"
+            translate_path_to_unix(relative_unix_path.clone()),
+            relative_unix_path
         );
 
         assert_eq!(
-            translate_path_to_unix("prefix:..\\wslgit\\src\\main.rs:postfix".to_string()),
-            "prefix:../wslgit/src/main.rs:postfix"
+            translate_path_to_unix(format!("prefix:{}:postfix", relative_windows_path)),
+            format!("prefix:{}:postfix", relative_unix_path)
         );
 
         assert_eq!(
@@ -828,8 +836,8 @@ mod tests {
         );
 
         assert_eq!(
-            translate_path_to_unix("\"prefix:..\\wslgit\\src\\main.rs\"".to_string()),
-            "\"prefix:../wslgit/src/main.rs\""
+            translate_path_to_unix(format!("\"prefix:{}\"", relative_windows_path)),
+            format!("\"prefix:{}\"", relative_unix_path)
         );
     }
 
