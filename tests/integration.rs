@@ -267,12 +267,21 @@ mod integration {
 
     #[test]
     fn shell_environment_variable() {
+        let expected_shell = Command::new("wsl")
+            .args(["-e", "/bin/bash", "-c", "printenv SHELL"])
+            .output()
+            .expect("failed to read the WSL shell environment");
+        assert!(expected_shell.status.success());
+        let expected_shell = String::from_utf8(expected_shell.stdout)
+            .expect("WSL returned a non-UTF-8 shell path")
+            .trim_end()
+            .to_string();
+
         Command::new(cargo_bin!(env!("CARGO_PKG_NAME")))
-            // Use pretty format to call 'printenv SHELL'
             .args(&["log", "-1", "--pretty=format:$(printenv SHELL)"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("/bin/bash"));
+            .stdout(expected_shell);
     }
 
     #[test]
