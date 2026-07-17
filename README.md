@@ -150,6 +150,36 @@ Combined with `WSLGIT_USE_INTERACTIVE_SHELL=smart` (default) this can make every
 
 This feature is only available in Windows 10 builds 17063 and later.
 
+### WSLGIT_ENABLE_LOGGING
+
+Internal diagnostic logging is disabled by default. To enable it, set the
+Windows environment variable `WSLGIT_ENABLE_LOGGING` to `true` or `1`. An
+unset variable and every other value, including `false` and `0`, leave logging
+disabled.
+
+This setting is separate from Fork's **Enable verbose Git output** preference.
+Enabling either setting does not enable the other: Fork's preference controls
+the Git output shown by Fork, while `WSLGIT_ENABLE_LOGGING` records wslgit's
+internal routing and timing metadata.
+
+When enabled, wslgit appends metadata-only records to `wslgit.log` next to the
+running executable. Every record includes a millisecond timestamp and process
+ID so events from concurrent invocations can be correlated. Records also
+include the wslgit version, routing events, argument counts, path-translation
+events, process-launch error kinds, completion status, and elapsed time. They
+do not include command arguments, repository paths, environment values, OS
+error messages, or credential material. The active log is limited to 1 MiB;
+when the next record would exceed that limit, it is rotated to `wslgit.log.1`.
+Only one backup is retained, for at most approximately 2 MiB total. Logging
+errors are ignored so they cannot interrupt Git operations. If another wslgit
+process is already updating the log, a diagnostic record can be dropped rather
+than delaying the Git command.
+
+Enable logging only while troubleshooting, reproduce the problem, inspect the
+two log files, and then unset `WSLGIT_ENABLE_LOGGING` or set it to `false` or
+`0`. Fork's verbose Git output can be enabled and disabled independently for
+the same troubleshooting session.
+
 ## Building from source
 
 First, install Rust from https://www.rust-lang.org. Rust on Windows also
