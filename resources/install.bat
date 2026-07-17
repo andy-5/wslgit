@@ -1,6 +1,6 @@
 @echo off
 net session >nul 2>&1
-if %ERRORLEVEL% neq 0 (
+if errorlevel 1 (
    echo.
    echo This script must be run as administrator to work properly!
    echo Right click on the script and select "Run as administrator".
@@ -19,7 +19,7 @@ if exist "%CMDDIR%\git.exe" (
 ) else (
     echo Create 'git.exe' symlink...
     mklink "%CMDDIR%\git.exe" "%CMDDIR%\wslgit.exe"
-    if %ERRORLEVEL% neq 0 (
+    if errorlevel 1 (
         echo ERROR! Failed to create symlink '%CMDDIR%\git.exe'.
         goto :error
     ) else (
@@ -31,7 +31,7 @@ echo.
 if not exist "%BINDIR%" (
     echo Create 'bin' directory...
     mkdir "%BINDIR%"
-    if %ERRORLEVEL% neq 0 (
+    if errorlevel 1 (
         echo ERROR! Failed to create directory '%BINDIR%'.
         goto :error
     ) else (
@@ -45,7 +45,7 @@ if exist "%BINDIR%\git.exe" (
 ) else (
     echo Create 'bin\git.exe' symlink...
     mklink "%BINDIR%\git.exe" "%CMDDIR%\wslgit.exe"
-    if %ERRORLEVEL% neq 0 (
+    if errorlevel 1 (
         echo ERROR! Failed to create symlink '%BINDIR%\git.exe'.
         goto :error
     ) else (
@@ -59,7 +59,7 @@ if exist "%BINDIR%\Fork.RI" (
 ) else (
     echo Create 'bin\Fork.RI' symlink...
     mklink "%BINDIR%\Fork.RI" "%CMDDIR%\Fork.RI"
-    if %ERRORLEVEL% neq 0 (
+    if errorlevel 1 (
         echo ERROR! Failed to create symlink '%BINDIR%\Fork.RI'.
         goto :error
     ) else (
@@ -73,7 +73,7 @@ if exist "%BINDIR%\sh.exe" (
 ) else (
     echo Create 'bin\sh.exe' symlink...
     mklink "%BINDIR%\sh.exe" "C:\Windows\System32\wsl.exe"
-    if %ERRORLEVEL% neq 0 (
+    if errorlevel 1 (
         echo ERROR! Failed to create symlink '%BINDIR%\sh.exe'.
         goto :error
     ) else (
@@ -87,7 +87,7 @@ if exist "%BINDIR%\bash.exe" (
 ) else (
     echo Create 'bin\bash.exe' symlink...
     mklink "%BINDIR%\bash.exe" "C:\Windows\System32\wsl.exe"
-    if %ERRORLEVEL% neq 0 (
+    if errorlevel 1 (
         echo ERROR! Failed to create symlink '%BINDIR%\bash.exe'.
         goto :error
     ) else (
