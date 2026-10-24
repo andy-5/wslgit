@@ -337,8 +337,8 @@ fn get_wsl_dist_name(path: &str) -> Option<String> {
 
     let wsl_dist_name = match unc_path_without_server {
         Some(p) => {
-            // the string p starts with the UNC 'share', which is the wsl dist name
-            let (dist_name, _) = p.split_once('\\').unwrap();
+            // The share itself is the distribution root and has no trailing separator.
+            let dist_name = p.split_once('\\').map_or(p, |(name, _)| name);
             Some(dist_name.to_string())
         }
         None => {
@@ -1069,6 +1069,14 @@ mod tests {
         );
         assert_eq!(
             get_wsl_dist_name(&r"\\wsl.localhost\dist-name\a\b\c".to_string()),
+            Some("dist-name".to_string())
+        );
+        assert_eq!(
+            get_wsl_dist_name(&r"\\wsl.localhost\dist-name".to_string()),
+            Some("dist-name".to_string())
+        );
+        assert_eq!(
+            get_wsl_dist_name(&r"\\wsl$\dist-name".to_string()),
             Some("dist-name".to_string())
         );
         assert_eq!(
